@@ -207,6 +207,7 @@ async function ensureTravelQuote() {
     $("#travelQuoteDetail").textContent = result.minimumDuration === 120
       ? "Por distancia y conectividad, esta dirección requiere una clase mínima de 2 horas."
       : "Calculado según distancia y tiempo requerido para realizar la clase.";
+    $("#travelQuote").classList.toggle("important-notice", result.minimumDuration === 120);
     $("#travelQuote").hidden = false;
     return true;
   } catch (error) {
@@ -414,6 +415,7 @@ function renderTimeSlots() {
   }
   const universityDisabled = state.busySlots.some(slot => slot.reason === "university-disabled");
   $("#availabilityStatus").className = `availability-status ${state.availabilitySource === "calendar" && !universityDisabled ? "live" : ""}`;
+  $("#availabilityStatus").classList.toggle("warning", universityDisabled);
   $("#availabilityStatus").textContent = universityDisabled
     ? "Este día no está habilitado para clases en la universidad."
     : state.availabilitySource === "calendar"
