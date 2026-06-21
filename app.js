@@ -10,7 +10,15 @@ const CONFIG = {
 };
 
 const CAREERS = {
-  "Ingeniería Civil": ["Cálculo I", "Cálculo II", "Álgebra", "Álgebra lineal", "Física I", "Física II", "Ecuaciones diferenciales", "Estática"],
+  "Ingeniería Civil": [
+    "Introducción al Cálculo",
+    "Introducción al Álgebra",
+    "Álgebra",
+    "Cálculo Diferencial",
+    "Cálculo Integral",
+    "Cálculo Multivariable",
+    "Probabilidad y Estadística",
+  ],
   "Ingeniería Comercial": [
     "Matemáticas Avanzadas I",
     "Matemáticas Avanzadas II",
