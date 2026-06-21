@@ -38,6 +38,7 @@ const state = {
   travelQuote: null,
   quotedAddress: "",
   sessions: [],
+  universityDays: [0, 1, 2, 3, 4, 5, 6],
 };
 
 const $ = (selector, root = document) => root.querySelector(selector);
@@ -84,6 +85,25 @@ function selectedCourse(data = formData()) {
   return data.level === "Universidad" ? data.career : data.schoolGrade;
 }
 
+function selectedLocation(data = formData()) {
+  if (data.modality === "Online") return "Google Meet";
+  if (data.modality === "Universidad") return data.universityLocation || "";
+  return data.homeLocation || "";
+}
+
+async function loadBookingSettings() {
+  try {
+    const response = await fetch(`${CONFIG.calendarApiUrl}?action=bookingSettings`);
+    const result = await response.json();
+    if (result.success && Array.isArray(result.universityDays)) {
+      state.universityDays = result.universityDays.map(Number);
+      renderCalendar();
+    }
+  } catch (error) {
+    console.error("No se pudo cargar la configuración de días.", error);
+  }
+}
+
 function initializeCareers() {
   $("#careerSelect").insertAdjacentHTML("beforeend", Object.keys(CAREERS).map(career => `<option>${career}</option>`).join(""));
 }
@@ -109,11 +129,10 @@ function updateLevelFields() {
 
 function updateModality() {
   const modality = formData().modality;
-  const needsLocation = modality === "Universidad" || modality === "A domicilio";
-  $("#locationField").hidden = !needsLocation;
-  form.location.required = needsLocation;
-  $("#locationLabel").textContent = modality === "A domicilio" ? "Dirección de la clase" : "Lugar dentro de la universidad";
-  form.location.placeholder = modality === "A domicilio" ? "Calle, número y comuna" : "Campus, biblioteca o sala";
+  $("#universityLocationField").hidden = modality !== "Universidad";
+  $("#homeLocationField").hidden = modality !== "A domicilio";
+  form.universityLocation.required = modality === "Universidad";
+  form.homeLocation.required = modality === "A domicilio";
   if (modality !== "A domicilio") {
     state.travelQuote = null;
     state.quotedAddress = "";
@@ -162,7 +181,7 @@ function syncMemberEmailRequirements() {
 async function ensureTravelQuote() {
   const data = formData();
   if (data.modality !== "A domicilio") return true;
-  const destination = data.location.trim();
+  const destination = data.homeLocation.trim();
   if (state.travelQuote && state.quotedAddress === destination) return true;
   const button = $("#nextButton");
   $("#formAlert").textContent = "";
@@ -325,7 +344,10 @@ function renderCalendar() {
     const isPast = day < today;
     const tooLate = day > lastBookable;
     const otherMonth = day.getMonth() !== state.month.getMonth();
-    const available = !isPast && !tooLate;
+    const universityBlocked =
+      formData().modality === "Universidad" &&
+      !state.universityDays.includes(day.getDay());
+    const available = !isPast && !tooLate && !universityBlocked;
     html += `<button type="button" class="calendar-day ${otherMonth ? "other-month" : ""} ${available ? "available" : ""} ${dateKey(today) === key ? "today" : ""} ${state.selectedDate === key ? "selected" : ""}" data-date="${key}" ${available ? "" : "disabled"}>${day.getDate()}</button>`;
   }
   $("#calendarDays").innerHTML = html;
@@ -462,7 +484,7 @@ function renderSummary() {
   $("#summarySessions").hidden = sessions.length === 1;
   $("#summarySessions").innerHTML = sessions.map(session => `<div class="summary-session"><span>${new Intl.DateTimeFormat("es-CL", { weekday: "long", day: "numeric", month: "long" }).format(parseDate(session.date))}</span><strong>${session.start}–${session.end}</strong></div>`).join("");
   $("#summaryDuration").textContent = duration === 60 ? "1 hora" : duration === 90 ? "1 hora 30 min" : "2 horas";
-  $("#summaryModality").textContent = data.modality === "Online" ? "Online · Google Meet" : `${data.modality} · ${data.location}`;
+  $("#summaryModality").textContent = data.modality === "Online" ? "Online · Google Meet" : `${data.modality} · ${selectedLocation(data)}`;
   $("#summaryStudent").textContent = data.name;
   $("#summaryClassType").textContent = data.classType === "Grupal"
     ? `Grupal · ${groupEmails().length + 1} integrantes`
@@ -494,7 +516,7 @@ function buildPayload(session = currentSession()) {
     modality: data.modality,
     classType: data.classType,
     groupEmails: data.classType === "Grupal" ? groupEmails() : [],
-    location: data.modality === "Online" ? "Google Meet" : data.location,
+    location: selectedLocation(data),
     date: session.date,
     start: session.start,
     end: session.end,
@@ -621,7 +643,7 @@ form.addEventListener("change", event => {
     if (error) error.textContent = "";
   }
 });
-form.location.addEventListener("input", () => {
+form.homeLocation.addEventListener("input", () => {
   state.travelQuote = null;
   state.quotedAddress = "";
   $("#travelQuote").hidden = true;
@@ -681,3 +703,4 @@ updateLevelFields();
 updateModality();
 updateClassType();
 renderCalendar();
+loadBookingSettings();

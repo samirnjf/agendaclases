@@ -35,6 +35,10 @@ Desde el resumen del panel también puedes elegir qué días de la semana acepta
 en la universidad. Los días deshabilitados quedan bloqueados en la página pública y
 se validan nuevamente antes de crear el evento.
 
+Las clases en la universidad no tienen costo adicional y permiten escoger Biblioteca
+Edificio A, Biblioteca Edificio F o Biblioteca Edificio C. La ubicación seleccionada
+es la opción ideal y queda sujeta a disponibilidad.
+
 Antes de utilizarlo:
 
 1. Cambia `ADMIN_KEY` en `google-apps-script/Code.gs` por una clave larga y privada.

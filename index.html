@@ -233,11 +233,26 @@
                 <small class="group-error"></small>
               </fieldset>
 
-              <label class="field location-field" id="locationField" hidden>
-                <span id="locationLabel">Lugar de la clase</span>
+              <label class="field location-field" id="universityLocationField" hidden>
+                <span>Lugar de la clase en la universidad</span>
                 <div class="input-wrap">
                   <svg viewBox="0 0 24 24"><path d="M20 10c0 5-8 11-8 11S4 15 4 10a8 8 0 1 1 16 0Z"/><circle cx="12" cy="10" r="2.5"/></svg>
-                  <input name="location" placeholder="Escribe la dirección o lugar" />
+                  <select name="universityLocation">
+                    <option value="">Selecciona una biblioteca</option>
+                    <option>Biblioteca Edificio A</option>
+                    <option>Biblioteca Edificio F</option>
+                    <option>Biblioteca Edificio C</option>
+                  </select>
+                </div>
+                <small class="field-error"></small>
+                <small class="location-note">Esta es la ubicación ideal, pero está sujeta a disponibilidad.</small>
+              </label>
+
+              <label class="field location-field" id="homeLocationField" hidden>
+                <span>Dirección de la clase</span>
+                <div class="input-wrap">
+                  <svg viewBox="0 0 24 24"><path d="M20 10c0 5-8 11-8 11S4 15 4 10a8 8 0 1 1 16 0Z"/><circle cx="12" cy="10" r="2.5"/></svg>
+                  <input name="homeLocation" placeholder="Calle, número y comuna" />
                 </div>
                 <small class="field-error"></small>
               </label>

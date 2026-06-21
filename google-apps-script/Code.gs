@@ -27,6 +27,12 @@ const ADMIN_KEY = "CAMBIA-ESTA-CLAVE-PRIVADA";
 
 function doGet(e) {
   try {
+    if (e.parameter.action === "bookingSettings") {
+      return jsonResponse({
+        success: true,
+        universityDays: getUniversityDays(),
+      });
+    }
     if (e.parameter.action !== "availability") {
       return jsonResponse({ success: true, service: "ClasesSNF Calendar API" });
     }
