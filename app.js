@@ -37,6 +37,7 @@ const state = {
   availabilitySource: "local",
   travelQuote: null,
   quotedAddress: "",
+  sessions: [],
 };
 
 const $ = (selector, root = document) => root.querySelector(selector);
@@ -296,8 +297,8 @@ function validateStep(step) {
     }
   }
 
-  if (step === 4 && (!state.selectedDate || !state.selectedTime)) {
-    $("#scheduleError").textContent = "Selecciona una fecha y un horario disponible.";
+  if (step === 4 && !getBookingSessions().length) {
+    $("#scheduleError").textContent = "Selecciona al menos una fecha y un horario disponible.";
     valid = false;
   }
   if (step === 5 && !form.terms.checked) {
@@ -333,6 +334,7 @@ function renderCalendar() {
 async function loadAvailability(date) {
   state.selectedDate = date;
   state.selectedTime = "";
+  $("#addSessionButton").disabled = true;
   renderCalendar();
   const panel = $("#timeSlots");
   panel.innerHTML = `<div class="slot-loading">Consultando agenda...</div>`;
@@ -376,7 +378,12 @@ function renderTimeSlots() {
       minutes(busy.start) < end + travelBuffer &&
       minutes(busy.end) > start - travelBuffer
     );
-    if (!isTooSoon && !blocked) slots.push({ start: startTime, end: endTime });
+    const overlapsSelected = state.sessions.some(session =>
+      session.date === state.selectedDate &&
+      minutes(session.start) < end + travelBuffer &&
+      minutes(session.end) > start - travelBuffer
+    );
+    if (!isTooSoon && !blocked && !overlapsSelected) slots.push({ start: startTime, end: endTime });
   }
   const universityDisabled = state.busySlots.some(slot => slot.reason === "university-disabled");
   $("#availabilityStatus").className = `availability-status ${state.availabilitySource === "calendar" && !universityDisabled ? "live" : ""}`;
@@ -387,20 +394,73 @@ function renderTimeSlots() {
       : CONFIG.calendarApiUrl ? "Disponibilidad local de respaldo" : "Vista previa · conecta Google Calendar para bloquear horas ocupadas";
 
   $("#timeSlots").innerHTML = slots.length
-    ? slots.map(slot => `<button class="time-slot" type="button" data-time="${slot.start}" data-end="${slot.end}">${slot.start}</button>`).join("")
+    ? slots.map(slot => {
+        const added = state.sessions.some(session => session.date === state.selectedDate && session.start === slot.start);
+        return `<button class="time-slot ${added ? "added" : ""}" type="button" data-time="${slot.start}" data-end="${slot.end}">${slot.start}${added ? " ✓" : ""}</button>`;
+      }).join("")
     : `<div class="no-slots"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M12 8v4l3 2"/></svg><span>No quedan horas disponibles este día.<br>Prueba con otra fecha.</span></div>`;
+}
+
+function currentSession() {
+  if (!state.selectedDate || !state.selectedTime) return null;
+  const duration = Number(formData().duration || 60);
+  return {
+    date: state.selectedDate,
+    start: state.selectedTime,
+    end: timeFromMinutes(minutes(state.selectedTime) + duration),
+  };
+}
+
+function getBookingSessions() {
+  const current = currentSession();
+  const sessions = [...state.sessions];
+  if (current && !sessions.some(session => session.date === current.date && session.start === current.start)) {
+    sessions.push(current);
+  }
+  return sessions.sort((a, b) => `${a.date}${a.start}`.localeCompare(`${b.date}${b.start}`));
+}
+
+function addCurrentSession() {
+  const session = currentSession();
+  if (!session) return;
+  if (!state.sessions.some(item => item.date === session.date && item.start === session.start)) {
+    state.sessions.push(session);
+  }
+  state.selectedTime = "";
+  $("#addSessionButton").disabled = true;
+  renderSelectedSessions();
+  renderTimeSlots();
+  $("#scheduleError").textContent = "";
+}
+
+function renderSelectedSessions() {
+  const container = $("#selectedSessions");
+  container.hidden = !state.sessions.length;
+  $("#selectedSessionsCount").textContent = `${state.sessions.length} ${state.sessions.length === 1 ? "clase" : "clases"}`;
+  $("#selectedSessionsList").innerHTML = state.sessions.map((session, index) => `
+    <div class="selected-session">
+      <div><strong>${new Intl.DateTimeFormat("es-CL", { weekday: "long", day: "numeric", month: "long" }).format(parseDate(session.date))}</strong><span>${session.start} a ${session.end}</span></div>
+      <span>${formData().duration} min</span>
+      <button type="button" data-remove-session="${index}" aria-label="Eliminar clase"><svg viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18"/></svg></button>
+    </div>`).join("");
 }
 
 function renderSummary() {
   const data = formData();
-  const date = parseDate(state.selectedDate);
+  const sessions = getBookingSessions();
+  const firstSession = sessions[0];
+  const date = parseDate(firstSession.date);
   const duration = Number(data.duration);
-  const end = timeFromMinutes(minutes(state.selectedTime) + duration);
+  const end = firstSession.end;
   $("#summaryDay").textContent = date.getDate();
   $("#summaryMonth").textContent = new Intl.DateTimeFormat("es-CL", { month: "short" }).format(date).replace(".", "");
   $("#summarySubject").textContent = `${data.level} · ${selectedCourse(data)}`;
   $("#summaryTitle").textContent = selectedSubject(data);
-  $("#summaryDateTime").textContent = `${new Intl.DateTimeFormat("es-CL", { weekday: "long", day: "numeric", month: "long" }).format(date)} · ${state.selectedTime} a ${end}`;
+  $("#summaryDateTime").textContent = sessions.length === 1
+    ? `${new Intl.DateTimeFormat("es-CL", { weekday: "long", day: "numeric", month: "long" }).format(date)} · ${firstSession.start} a ${end}`
+    : `${sessions.length} clases seleccionadas`;
+  $("#summarySessions").hidden = sessions.length === 1;
+  $("#summarySessions").innerHTML = sessions.map(session => `<div class="summary-session"><span>${new Intl.DateTimeFormat("es-CL", { weekday: "long", day: "numeric", month: "long" }).format(parseDate(session.date))}</span><strong>${session.start}–${session.end}</strong></div>`).join("");
   $("#summaryDuration").textContent = duration === 60 ? "1 hora" : duration === 90 ? "1 hora 30 min" : "2 horas";
   $("#summaryModality").textContent = data.modality === "Online" ? "Online · Google Meet" : `${data.modality} · ${data.location}`;
   $("#summaryStudent").textContent = data.name;
@@ -414,12 +474,12 @@ function renderSummary() {
   const basePrice = CONFIG.pricePerHour * duration / 60;
   const travelSurcharge = data.modality === "A domicilio" ? Number(state.travelQuote?.surcharge || 0) : 0;
   $("#summaryTravelBreakdown").hidden = !travelSurcharge;
-  $("#summaryBasePrice").textContent = money.format(basePrice);
-  $("#summaryTravelPrice").textContent = money.format(travelSurcharge);
-  $("#summaryPrice").textContent = money.format(basePrice + travelSurcharge);
+  $("#summaryBasePrice").textContent = money.format(basePrice * sessions.length);
+  $("#summaryTravelPrice").textContent = money.format(travelSurcharge * sessions.length);
+  $("#summaryPrice").textContent = money.format((basePrice + travelSurcharge) * sessions.length);
 }
 
-function buildPayload() {
+function buildPayload(session = currentSession()) {
   const data = formData();
   const duration = Number(data.duration);
   return {
@@ -435,9 +495,9 @@ function buildPayload() {
     classType: data.classType,
     groupEmails: data.classType === "Grupal" ? groupEmails() : [],
     location: data.modality === "Online" ? "Google Meet" : data.location,
-    date: state.selectedDate,
-    start: state.selectedTime,
-    end: timeFromMinutes(minutes(state.selectedTime) + duration),
+    date: session.date,
+    start: session.start,
+    end: session.end,
     duration,
     price: CONFIG.pricePerHour * duration / 60 + Number(state.travelQuote?.surcharge || 0),
     travelSurcharge: Number(state.travelQuote?.surcharge || 0),
@@ -448,26 +508,42 @@ function buildPayload() {
 
 async function submitBooking() {
   if (!validateStep(5)) return;
-  const payload = buildPayload();
+  const sessions = getBookingSessions();
   const button = $("#submitButton");
   button.disabled = true;
   button.textContent = "Confirmando...";
   $("#formAlert").textContent = "";
 
   try {
-    let result = { success: true, demo: true };
-    if (CONFIG.calendarApiUrl) {
-      const response = await fetch(CONFIG.calendarApiUrl, {
-        method: "POST",
-        headers: { "Content-Type": "text/plain;charset=utf-8" },
-        body: JSON.stringify({ action: "book", ...payload }),
-      });
-      result = await response.json();
-      if (!response.ok || !result.success) throw new Error(result.error || "No fue posible crear la reserva.");
-    } else {
-      await new Promise(resolve => setTimeout(resolve, 650));
+    const results = [];
+    let completed = 0;
+    for (const session of sessions) {
+      const payload = buildPayload(session);
+      if (CONFIG.calendarApiUrl) {
+        const response = await fetch(CONFIG.calendarApiUrl, {
+          method: "POST",
+          headers: { "Content-Type": "text/plain;charset=utf-8" },
+          body: JSON.stringify({ action: "book", ...payload }),
+        });
+        const result = await response.json();
+        if (!response.ok || !result.success) {
+          state.sessions = sessions.slice(completed);
+          state.selectedDate = "";
+          state.selectedTime = "";
+          renderSelectedSessions();
+          const prefix = completed
+            ? `${completed} ${completed === 1 ? "clase fue creada" : "clases fueron creadas"}. `
+            : "";
+          throw new Error(`${prefix}${session.date} a las ${session.start}: ${result.error || "no fue posible crear la reserva."}`);
+        }
+        results.push(result);
+        completed += 1;
+      } else {
+        await new Promise(resolve => setTimeout(resolve, 250));
+        completed += 1;
+      }
     }
-    showSuccess(payload, result);
+    showSuccess(buildPayload(sessions[0]), results[0] || { success: true, demo: true }, sessions);
   } catch (error) {
     $("#formAlert").textContent = `${error.message} Actualiza la disponibilidad e intenta nuevamente.`;
   } finally {
@@ -476,11 +552,11 @@ async function submitBooking() {
   }
 }
 
-function showSuccess(payload, result) {
+function showSuccess(payload, result, sessions) {
   $("#successMessage").textContent = result.demo
     ? "La interfaz funciona correctamente. Conecta Google Calendar para que la reserva se cree y envíe de forma real."
-    : `Enviamos la invitación a ${payload.email}. Revisa también la carpeta de spam.`;
-  $("#successDetails").innerHTML = `<strong>${payload.subject}</strong><br>${new Intl.DateTimeFormat("es-CL", { dateStyle: "full" }).format(parseDate(payload.date))}<br>${payload.start} · ${payload.modality}`;
+    : `Enviamos ${sessions.length === 1 ? "la invitación" : `${sessions.length} invitaciones`} a ${payload.email}. Revisa también la carpeta de spam.`;
+  $("#successDetails").innerHTML = `<strong>${payload.subject}</strong><br>${sessions.length === 1 ? new Intl.DateTimeFormat("es-CL", { dateStyle: "full" }).format(parseDate(payload.date)) : `${sessions.length} clases agendadas`}<br>${sessions.length === 1 ? `${payload.start} · ` : ""}${payload.modality}`;
   const link = $("#calendarLink");
   link.hidden = !result.eventUrl;
   if (result.eventUrl) link.href = result.eventUrl;
@@ -493,12 +569,14 @@ function resetBooking() {
   state.selectedTime = "";
   state.travelQuote = null;
   state.quotedAddress = "";
+  state.sessions = [];
   state.month = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
   updateLevelFields();
   updateModality();
   updateClassType();
   $("#memberEmailList").innerHTML = "";
   $("#successDialog").close();
+  renderSelectedSessions();
   setStep(1);
 }
 
@@ -528,8 +606,14 @@ form.addEventListener("change", event => {
     if (state.selectedDate) loadAvailability(state.selectedDate);
   }
   if (event.target.name === "classType") updateClassType();
-  if (event.target.name === "duration" && state.selectedDate) loadAvailability(state.selectedDate);
-  if (event.target.name === "duration" && state.travelQuote) updateDisplayedTravelPrice();
+  if (event.target.name === "duration") {
+    state.sessions = [];
+    state.selectedTime = "";
+    renderSelectedSessions();
+    $("#addSessionButton").disabled = true;
+    if (state.selectedDate) loadAvailability(state.selectedDate);
+    if (state.travelQuote) updateDisplayedTravelPrice();
+  }
   const field = event.target.closest(".field");
   if (field) {
     field.classList.remove("invalid");
@@ -565,7 +649,16 @@ $("#timeSlots").addEventListener("click", event => {
   $$(".time-slot").forEach(item => item.classList.remove("selected"));
   slot.classList.add("selected");
   state.selectedTime = slot.dataset.time;
+  $("#addSessionButton").disabled = false;
   $("#scheduleError").textContent = "";
+});
+$("#addSessionButton").addEventListener("click", addCurrentSession);
+$("#selectedSessionsList").addEventListener("click", event => {
+  const remove = event.target.closest("[data-remove-session]");
+  if (!remove) return;
+  state.sessions.splice(Number(remove.dataset.removeSession), 1);
+  renderSelectedSessions();
+  if (state.selectedDate) renderTimeSlots();
 });
 $("#previousMonth").addEventListener("click", () => {
   const currentMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1);

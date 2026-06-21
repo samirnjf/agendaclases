@@ -286,6 +286,14 @@
                   </div>
                 </div>
               </div>
+              <div class="multi-booking-bar">
+                <div><strong>¿Quieres agendar más de una?</strong><span>Selecciona un horario y agrégalo. Luego puedes elegir otra fecha.</span></div>
+                <button type="button" id="addSessionButton" disabled><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg> Agregar esta clase</button>
+              </div>
+              <div class="selected-sessions" id="selectedSessions" hidden>
+                <div class="selected-sessions-heading"><strong>Clases seleccionadas</strong><span id="selectedSessionsCount"></span></div>
+                <div id="selectedSessionsList"></div>
+              </div>
               <small class="schedule-error" id="scheduleError"></small>
             </section>
 
@@ -300,6 +308,7 @@
                   <span class="summary-date"><strong id="summaryDay"></strong><small id="summaryMonth"></small></span>
                   <div><span id="summarySubject"></span><h3 id="summaryTitle"></h3><p id="summaryDateTime"></p></div>
                 </div>
+                <div class="summary-sessions" id="summarySessions" hidden></div>
                 <div class="summary-grid">
                   <div><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M12 8v4l3 2"/></svg><span>Duración<strong id="summaryDuration"></strong></span></div>
                   <div><svg viewBox="0 0 24 24"><path d="M20 10c0 5-8 11-8 11S4 15 4 10a8 8 0 1 1 16 0Z"/><circle cx="12" cy="10" r="2.5"/></svg><span>Modalidad<strong id="summaryModality"></strong></span></div>

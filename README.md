@@ -2,6 +2,9 @@
 
 Flujo público para que estudiantes reserven una clase según nivel, carrera, ramo, modalidad, duración y disponibilidad.
 
+El estudiante puede seleccionar y confirmar varias fechas en una sola reserva. Cada clase
+se valida por separado y genera su propio evento e invitación de Google Calendar.
+
 ## Ejecutar localmente
 
 ```bash
