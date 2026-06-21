@@ -1,5 +1,5 @@
 /**
- * Backend de ClaseLista para Google Apps Script.
+ * Backend de ClasesSNF para Google Apps Script.
  *
  * 1. Crea un proyecto en https://script.google.com
  * 2. Copia este archivo y appsscript.json.
@@ -28,7 +28,7 @@ const ADMIN_KEY = "CAMBIA-ESTA-CLAVE-PRIVADA";
 function doGet(e) {
   try {
     if (e.parameter.action !== "availability") {
-      return jsonResponse({ success: true, service: "ClaseLista Calendar API" });
+      return jsonResponse({ success: true, service: "ClasesSNF Calendar API" });
     }
     const date = requireDate(e.parameter.date);
     const start = new Date(`${date}T00:00:00`);
@@ -162,7 +162,7 @@ function sendNewBookingNotification(data, event) {
       ? `Integrantes: ${data.groupEmails.join(", ")}`
       : "";
     const body = [
-      "Se agendó una nueva clase en ClaseLista.",
+      "Se agendó una nueva clase en ClasesSNF.",
       "",
       `Estudiante: ${data.name}`,
       `Correo: ${data.email}`,
@@ -564,7 +564,7 @@ function sendDailyPaymentReminder() {
     ].join("\n");
   });
 
-  const subject = `ClaseLista: ${unpaid.length} ${unpaid.length === 1 ? "pago pendiente" : "pagos pendientes"}`;
+  const subject = `ClasesSNF: ${unpaid.length} ${unpaid.length === 1 ? "pago pendiente" : "pagos pendientes"}`;
   const body = [
     "Recordatorio diario de transferencias pendientes",
     "",

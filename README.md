@@ -1,4 +1,4 @@
-# ClaseLista — reserva de clases
+# ClasesSNF — reserva de clases
 
 Flujo público para que estudiantes reserven una clase según nivel, carrera, ramo, modalidad, duración y disponibilidad.
 
