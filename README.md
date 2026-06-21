@@ -28,6 +28,10 @@ La interfaz funciona en modo demostración hasta conectar una cuenta:
 El panel se encuentra en `/admin.html` y muestra clientes, próximas clases, historial,
 frecuencia, pagos e ingresos esperados.
 
+Desde el resumen del panel también puedes elegir qué días de la semana aceptas clases
+en la universidad. Los días deshabilitados quedan bloqueados en la página pública y
+se validan nuevamente antes de crear el evento.
+
 Antes de utilizarlo:
 
 1. Cambia `ADMIN_KEY` en `google-apps-script/Code.gs` por una clave larga y privada.

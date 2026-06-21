@@ -343,11 +343,15 @@ async function loadAvailability(date) {
   state.availabilitySource = "local";
   if (CONFIG.calendarApiUrl) {
     try {
-      const response = await fetch(`${CONFIG.calendarApiUrl}?action=availability&date=${date}&timezone=${encodeURIComponent(CONFIG.timezone)}`);
+      const modality = encodeURIComponent(formData().modality || "");
+      const response = await fetch(`${CONFIG.calendarApiUrl}?action=availability&date=${date}&modality=${modality}&timezone=${encodeURIComponent(CONFIG.timezone)}`);
       if (!response.ok) throw new Error("No fue posible consultar Calendar");
       const result = await response.json();
       state.busySlots = result.busy || [];
       state.availabilitySource = "calendar";
+      if (result.universityDayEnabled === false) {
+        $("#availabilityStatus").textContent = "Este día no está habilitado para clases en la universidad.";
+      }
     } catch (error) {
       console.error(error);
       showToast("No se pudo consultar Google Calendar. Revisa la configuración.");
@@ -374,10 +378,13 @@ function renderTimeSlots() {
     );
     if (!isTooSoon && !blocked) slots.push({ start: startTime, end: endTime });
   }
-  $("#availabilityStatus").className = `availability-status ${state.availabilitySource === "calendar" ? "live" : ""}`;
-  $("#availabilityStatus").textContent = state.availabilitySource === "calendar"
-    ? "● Disponibilidad sincronizada con Google Calendar"
-    : CONFIG.calendarApiUrl ? "Disponibilidad local de respaldo" : "Vista previa · conecta Google Calendar para bloquear horas ocupadas";
+  const universityDisabled = state.busySlots.some(slot => slot.reason === "university-disabled");
+  $("#availabilityStatus").className = `availability-status ${state.availabilitySource === "calendar" && !universityDisabled ? "live" : ""}`;
+  $("#availabilityStatus").textContent = universityDisabled
+    ? "Este día no está habilitado para clases en la universidad."
+    : state.availabilitySource === "calendar"
+      ? "● Disponibilidad sincronizada con Google Calendar"
+      : CONFIG.calendarApiUrl ? "Disponibilidad local de respaldo" : "Vista previa · conecta Google Calendar para bloquear horas ocupadas";
 
   $("#timeSlots").innerHTML = slots.length
     ? slots.map(slot => `<button class="time-slot" type="button" data-time="${slot.start}" data-end="${slot.end}">${slot.start}</button>`).join("")
@@ -516,7 +523,10 @@ form.addEventListener("submit", event => {
 form.addEventListener("change", event => {
   if (event.target.name === "level") updateLevelFields();
   if (event.target.name === "career") updateSubjects();
-  if (event.target.name === "modality") updateModality();
+  if (event.target.name === "modality") {
+    updateModality();
+    if (state.selectedDate) loadAvailability(state.selectedDate);
+  }
   if (event.target.name === "classType") updateClassType();
   if (event.target.name === "duration" && state.selectedDate) loadAvailability(state.selectedDate);
   if (event.target.name === "duration" && state.travelQuote) updateDisplayedTravelPrice();

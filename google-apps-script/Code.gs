@@ -31,12 +31,21 @@ function doGet(e) {
       return jsonResponse({ success: true, service: "ClasesSNF Calendar API" });
     }
     const date = requireDate(e.parameter.date);
+    const modality = String(e.parameter.modality || "");
+    if (modality === "Universidad" && !isUniversityDayEnabled(date)) {
+      return jsonResponse({
+        success: true,
+        date,
+        busy: [{ start: "00:00", end: "23:59", reason: "university-disabled" }],
+        universityDayEnabled: false,
+      });
+    }
     const start = new Date(`${date}T00:00:00`);
     const searchStart = new Date(start.getTime() - 24 * 60 * 60 * 1000);
     const end = new Date(`${date}T23:59:59`);
     const events = CalendarApp.getCalendarById(CALENDAR_ID).getEvents(searchStart, end);
     const busy = buildBusySlots(events, date);
-    return jsonResponse({ success: true, date, busy });
+    return jsonResponse({ success: true, date, busy, universityDayEnabled: true });
   } catch (error) {
     return jsonResponse({ success: false, error: error.message });
   }
@@ -61,10 +70,18 @@ function doPost(e) {
       setupDailyPaymentReminder();
       return jsonResponse({ success: true, reminderEnabled: true });
     }
+    if (data.action === "updateUniversityDays") {
+      requireAdmin(data.adminKey);
+      const universityDays = saveUniversityDays(data.days);
+      return jsonResponse({ success: true, universityDays });
+    }
     if (data.action === "travelQuote") {
       return jsonResponse({ success: true, ...calculateTravelQuote(data.destination) });
     }
     validateBooking(data);
+    if (data.modality === "Universidad" && !isUniversityDayEnabled(data.date)) {
+      throw new Error("Ese día no está habilitado para clases en la universidad.");
+    }
 
     const basePrice = BASE_HOURLY_RATE * Number(data.duration) / 60;
     const travelQuote = data.modality === "A domicilio"
@@ -379,6 +396,30 @@ function requireAdmin(key) {
   if (!key || key !== ADMIN_KEY) throw new Error("Clave administrativa incorrecta.");
 }
 
+function getUniversityDays() {
+  const saved = PropertiesService.getScriptProperties().getProperty("UNIVERSITY_DAYS");
+  if (!saved) return [1, 2, 3, 4, 5, 6, 0];
+  try {
+    const parsed = JSON.parse(saved);
+    return Array.isArray(parsed) ? parsed.map(Number).filter(day => day >= 0 && day <= 6) : [];
+  } catch (error) {
+    return [1, 2, 3, 4, 5, 6, 0];
+  }
+}
+
+function saveUniversityDays(days) {
+  if (!Array.isArray(days)) throw new Error("La configuración de días no es válida.");
+  const normalized = [...new Set(days.map(Number).filter(day => day >= 0 && day <= 6))];
+  PropertiesService.getScriptProperties().setProperty("UNIVERSITY_DAYS", JSON.stringify(normalized));
+  return normalized;
+}
+
+function isUniversityDayEnabled(date) {
+  const noon = new Date(`${date}T12:00:00`);
+  const weekday = noon.getDay();
+  return getUniversityDays().indexOf(weekday) >= 0;
+}
+
 function buildAdminReport() {
   const now = new Date();
   const from = new Date(now);
@@ -441,6 +482,7 @@ function buildAdminReport() {
   return {
     success: true,
     generatedAt: now.toISOString(),
+    universityDays: getUniversityDays(),
     metrics: {
       activeClients: clients.filter(client => client.nextClass).length,
       totalClients: clients.length,

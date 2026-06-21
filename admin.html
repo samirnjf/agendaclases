@@ -54,6 +54,19 @@
             <div class="overview-grid">
               <article class="panel"><div class="panel-heading"><div><span class="eyebrow">Agenda</span><h2>Próximas clases</h2></div><button data-go="upcoming">Ver todas</button></div><div id="overviewUpcoming"></div></article>
               <article class="panel"><div class="panel-heading"><div><span class="eyebrow">Clientes</span><h2>Más frecuentes</h2></div><button data-go="clients">Ver todos</button></div><div id="overviewFrequent"></div></article>
+              <article class="panel university-settings">
+                <div class="panel-heading"><div><span class="eyebrow">Modalidad universidad</span><h2>Días habilitados</h2></div><span class="settings-state" id="universityDaysState"></span></div>
+                <div class="university-days" id="universityDays">
+                  <label><input type="checkbox" value="1"><span>Lun</span></label>
+                  <label><input type="checkbox" value="2"><span>Mar</span></label>
+                  <label><input type="checkbox" value="3"><span>Mié</span></label>
+                  <label><input type="checkbox" value="4"><span>Jue</span></label>
+                  <label><input type="checkbox" value="5"><span>Vie</span></label>
+                  <label><input type="checkbox" value="6"><span>Sáb</span></label>
+                  <label><input type="checkbox" value="0"><span>Dom</span></label>
+                </div>
+                <div class="settings-footer"><p>Los días desactivados no mostrarán horarios para clases en la universidad.</p><button type="button" id="saveUniversityDays">Guardar días</button></div>
+              </article>
             </div>
           </section>
           <section class="page-section" data-page="upcoming">

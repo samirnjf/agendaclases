@@ -42,11 +42,20 @@ async function loadReport() {
 
 function renderAll() {
   renderReminderStatus();
+  renderUniversityDays();
   renderMetrics();
   renderOverview();
   renderTable("upcomingTable", report.upcoming);
   renderTable("historyTable", report.history);
   renderClients(report.frequent);
+}
+
+function renderUniversityDays() {
+  const enabled = new Set((report.universityDays || []).map(Number));
+  $$('#universityDays input[type="checkbox"]').forEach(input => {
+    input.checked = enabled.has(Number(input.value));
+  });
+  $("#universityDaysState").textContent = `${enabled.size} de 7 días activos`;
 }
 
 function renderReminderStatus() {
@@ -160,6 +169,23 @@ $("#loginForm").addEventListener("submit", event => {
   loadReport();
 });
 $("#refreshButton").addEventListener("click", loadReport);
+$("#saveUniversityDays").addEventListener("click", async () => {
+  const button = $("#saveUniversityDays");
+  const days = $$('#universityDays input:checked').map(input => Number(input.value));
+  button.disabled = true;
+  button.textContent = "Guardando...";
+  try {
+    const result = await api({ action: "updateUniversityDays", days });
+    report.universityDays = result.universityDays;
+    renderUniversityDays();
+    toast("Días de universidad actualizados");
+  } catch (error) {
+    toast(error.message);
+  } finally {
+    button.disabled = false;
+    button.textContent = "Guardar días";
+  }
+});
 $("#reminderButton").addEventListener("click", async () => {
   const button = $("#reminderButton");
   button.disabled = true;
