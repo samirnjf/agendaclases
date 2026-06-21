@@ -66,6 +66,9 @@ Con la integración activa:
 - Los eventos cuyo título incluya prueba, evaluación, examen, control, certamen
   o presentación bloquean desde las 07:00 hasta una hora después de su término.
   La detección ignora mayúsculas, minúsculas y tildes.
+- Cuando un evento contiene “banco”, su horario y todo el período posterior hasta
+  finalizar el día quedan bloqueados para Universidad. Después del evento, Online y
+  Domicilio continúan disponibles.
 - Una reserva vuelve a comprobar conflictos antes de guardarse.
 - Se crea el evento en tu calendario.
 - Recibes un correo inmediato con el detalle de cada nueva reserva.

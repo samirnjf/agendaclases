@@ -20,6 +20,7 @@ const DEFAULT_TRANSIT_FARE_PER_LEG = 900;
 const CAR_COST_PER_KM = 220;
 const EVALUATION_BUFFER_MINUTES = 60;
 const EVALUATION_KEYWORDS = ["prueba", "evaluacion", "examen", "control", "certamen", "presentacion"];
+const UNIVERSITY_AFTER_EVENT_KEYWORDS = ["banco"];
 // Color 5 corresponde a amarillo ("Banana") en Google Calendar.
 const CLASS_EVENT_COLOR_ID = "5";
 // Cambia esta clave antes de desplegar. Se usará para entrar al panel privado.
@@ -50,7 +51,7 @@ function doGet(e) {
     const searchStart = new Date(start.getTime() - 24 * 60 * 60 * 1000);
     const end = new Date(`${date}T23:59:59`);
     const events = CalendarApp.getCalendarById(CALENDAR_ID).getEvents(searchStart, end);
-    const busy = buildBusySlots(events, date);
+    const busy = buildBusySlots(events, date, modality);
     return jsonResponse({ success: true, date, busy, universityDayEnabled: true });
   } catch (error) {
     return jsonResponse({ success: false, error: error.message });
@@ -107,7 +108,7 @@ function doPost(e) {
     const dayStart = new Date(`${data.date}T00:00:00`);
     const searchStart = new Date(dayStart.getTime() - 24 * 60 * 60 * 1000);
     const dayEnd = new Date(`${data.date}T23:59:59`);
-    const busySlots = buildBusySlots(calendar.getEvents(searchStart, dayEnd), data.date);
+    const busySlots = buildBusySlots(calendar.getEvents(searchStart, dayEnd), data.date, data.modality);
     const oneWayTravelMinutes = data.modality === "A domicilio"
       ? Math.ceil(travelQuote.roundTripMinutes / 2)
       : 0;
@@ -308,7 +309,7 @@ function routeUsesMetro(leg) {
  * Las pruebas y evaluaciones bloquean desde las 07:00 hasta una hora después
  * de terminar. Los demás eventos bloquean únicamente su duración real.
  */
-function buildBusySlots(events, date) {
+function buildBusySlots(events, date, modality) {
   const slots = [];
   events.forEach(event => {
     const isEvaluation = isEvaluationEvent(event.getTitle());
@@ -320,6 +321,16 @@ function buildBusySlots(events, date) {
     if (event.isAllDayEvent()) {
       if (eventEndDate <= date) return;
       slots.push({ start: "00:00", end: "23:59", reason: isEvaluation ? "evaluation" : "event" });
+      return;
+    }
+
+    if (modality === "Universidad" && isUniversityAfterEvent(event.getTitle())) {
+      if (eventEndDate < date || eventStartDate > date) return;
+      slots.push({
+        start: eventStartDate < date ? "00:00" : Utilities.formatDate(eventStart, TIMEZONE, "HH:mm"),
+        end: "23:59",
+        reason: "university-after-event",
+      });
       return;
     }
 
@@ -369,11 +380,20 @@ function getHomeClassTravelMinutes(event) {
 }
 
 function isEvaluationEvent(title) {
-  const normalized = String(title || "")
+  const normalized = normalizeCalendarTitle(title);
+  return EVALUATION_KEYWORDS.some(keyword => normalized.indexOf(keyword) >= 0);
+}
+
+function isUniversityAfterEvent(title) {
+  const normalized = normalizeCalendarTitle(title);
+  return UNIVERSITY_AFTER_EVENT_KEYWORDS.some(keyword => normalized.indexOf(keyword) >= 0);
+}
+
+function normalizeCalendarTitle(title) {
+  return String(title || "")
     .toLowerCase()
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "");
-  return EVALUATION_KEYWORDS.some(keyword => normalized.indexOf(keyword) >= 0);
 }
 
 function timeToMinutes(time) {
