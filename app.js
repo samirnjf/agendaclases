@@ -117,6 +117,7 @@ function updateModality() {
     state.travelQuote = null;
     state.quotedAddress = "";
     $("#travelQuote").hidden = true;
+    applyHomeDurationRule(60);
   }
 }
 
@@ -167,8 +168,11 @@ async function ensureTravelQuote() {
     if (!result.success) throw new Error(result.error || "No fue posible calcular el traslado.");
     state.travelQuote = result;
     state.quotedAddress = destination;
-    $("#travelQuotePrice").textContent = money.format(result.surcharge);
-    $("#travelQuoteDetail").textContent = `Aprox. ${result.roundTripMinutes} min de traslado total`;
+    applyHomeDurationRule(result.minimumDuration || 60);
+    updateDisplayedTravelPrice();
+    $("#travelQuoteDetail").textContent = result.minimumDuration === 120
+      ? "Por distancia y conectividad, esta dirección requiere una clase mínima de 2 horas."
+      : "Calculado según distancia y tiempo requerido para realizar la clase.";
     $("#travelQuote").hidden = false;
     return true;
   } catch (error) {
@@ -178,6 +182,28 @@ async function ensureTravelQuote() {
     button.disabled = false;
     button.innerHTML = `Continuar <svg viewBox="0 0 24 24"><path d="m9 5 7 7-7 7"/></svg>`;
   }
+}
+
+function applyHomeDurationRule(minimumDuration = 60) {
+  $$('input[name="duration"]').forEach(input => {
+    input.disabled = Number(input.value) < minimumDuration;
+    input.closest("label").classList.toggle("disabled", input.disabled);
+  });
+  const selected = form.querySelector('input[name="duration"]:checked');
+  if (!selected || selected.disabled) {
+    form.querySelector(`input[name="duration"][value="${minimumDuration === 120 ? 120 : 60}"]`).checked = true;
+  }
+}
+
+function updateDisplayedTravelPrice() {
+  if (!state.travelQuote) return;
+  const duration = Number(formData().duration || 60);
+  const basePrice = CONFIG.pricePerHour * duration / 60;
+  state.travelQuote.surcharge = Math.min(
+    Number(state.travelQuote.rawSurcharge ?? state.travelQuote.surcharge ?? 0),
+    basePrice,
+  );
+  $("#travelQuotePrice").textContent = money.format(state.travelQuote.surcharge);
 }
 
 function setStep(next) {
@@ -315,14 +341,19 @@ async function loadAvailability(date) {
 function renderTimeSlots() {
   const duration = Number(formData().duration || 60);
   const now = new Date();
-  const selected = parseDate(state.selectedDate);
+  const travelBuffer = formData().modality === "A domicilio"
+    ? Math.ceil(Number(state.travelQuote?.roundTripMinutes || 0) / 2)
+    : 0;
   const slots = [];
   for (let start = CONFIG.firstStartHour * 60; start <= CONFIG.lastStartHour * 60; start += CONFIG.slotIntervalMinutes) {
     const end = start + duration;
     const startTime = timeFromMinutes(start);
     const endTime = timeFromMinutes(end);
     const isTooSoon = dateKey(now) === state.selectedDate && start <= now.getHours() * 60 + now.getMinutes() + 60;
-    const blocked = state.busySlots.some(busy => minutes(busy.start) < end && minutes(busy.end) > start);
+    const blocked = state.busySlots.some(busy =>
+      minutes(busy.start) < end + travelBuffer &&
+      minutes(busy.end) > start - travelBuffer
+    );
     if (!isTooSoon && !blocked) slots.push({ start: startTime, end: endTime });
   }
   $("#availabilityStatus").className = `availability-status ${state.availabilitySource === "calendar" ? "live" : ""}`;
@@ -470,6 +501,7 @@ form.addEventListener("change", event => {
   if (event.target.name === "modality") updateModality();
   if (event.target.name === "classType") updateClassType();
   if (event.target.name === "duration" && state.selectedDate) loadAvailability(state.selectedDate);
+  if (event.target.name === "duration" && state.travelQuote) updateDisplayedTravelPrice();
   const field = event.target.closest(".field");
   if (field) {
     field.classList.remove("invalid");

@@ -58,6 +58,9 @@ Con la integración activa:
 - Para clases online se crea un enlace de Google Meet.
 - Todas las clases nuevas se crean con color amarillo en Google Calendar.
 - Las clases a domicilio agregan un recargo calculado por tiempo y costo de traslado.
+- El adicional a domicilio nunca supera el valor base de la clase.
+- Los destinos lejanos sin acceso razonable a Metro requieren una clase mínima de 2 horas.
+- El calendario bloquea también los tiempos estimados de ida y vuelta.
 - En clases grupales se invita al correo principal y a todos los integrantes.
 - La reserva puede registrar opcionalmente quién recomendó la clase.
 

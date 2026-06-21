@@ -69,10 +69,13 @@ function doPost(e) {
     const basePrice = BASE_HOURLY_RATE * Number(data.duration) / 60;
     const travelQuote = data.modality === "A domicilio"
       ? calculateTravelQuote(data.location)
-      : { surcharge: 0, roundTripMinutes: 0 };
-    data.travelSurcharge = travelQuote.surcharge;
+      : { rawSurcharge: 0, roundTripMinutes: 0, minimumDuration: 60 };
+    if (Number(data.duration) < travelQuote.minimumDuration) {
+      throw new Error("Para esta dirección la clase debe durar al menos 2 horas.");
+    }
+    data.travelSurcharge = Math.min(travelQuote.rawSurcharge, basePrice);
     data.travelMinutes = travelQuote.roundTripMinutes;
-    data.price = basePrice + travelQuote.surcharge;
+    data.price = basePrice + data.travelSurcharge;
 
     const start = new Date(`${data.date}T${data.start}:00`);
     const end = new Date(`${data.date}T${data.end}:00`);
@@ -81,8 +84,11 @@ function doPost(e) {
     const searchStart = new Date(dayStart.getTime() - 24 * 60 * 60 * 1000);
     const dayEnd = new Date(`${data.date}T23:59:59`);
     const busySlots = buildBusySlots(calendar.getEvents(searchStart, dayEnd), data.date);
-    const requestedStart = timeToMinutes(data.start);
-    const requestedEnd = timeToMinutes(data.end);
+    const oneWayTravelMinutes = data.modality === "A domicilio"
+      ? Math.ceil(travelQuote.roundTripMinutes / 2)
+      : 0;
+    const requestedStart = timeToMinutes(data.start) - oneWayTravelMinutes;
+    const requestedEnd = timeToMinutes(data.end) + oneWayTravelMinutes;
     const hasConflict = busySlots.some(slot =>
       timeToMinutes(slot.start) < requestedEnd &&
       timeToMinutes(slot.end) > requestedStart
@@ -103,7 +109,7 @@ function doPost(e) {
       data.groupEmails && data.groupEmails.length ? `Integrantes: ${data.groupEmails.join(", ")}` : "",
       `Lugar: ${data.location}`,
       data.topic ? `Contenido: ${data.topic}` : "",
-      data.travelSurcharge ? `Recargo traslado: $${Number(data.travelSurcharge).toLocaleString("es-CL")}` : "",
+      data.travelSurcharge ? `Costo adicional clase a domicilio: $${Number(data.travelSurcharge).toLocaleString("es-CL")}` : "",
       data.travelMinutes ? `Tiempo traslado estimado: ${data.travelMinutes} minutos ida y vuelta` : "",
       `Valor: $${Number(data.price).toLocaleString("es-CL")}`,
     ].filter(Boolean).join("\n");
@@ -167,6 +173,7 @@ function calculateTravelQuote(destination) {
       minutes: Math.round(driving.minutes * 1.35),
       distanceKm: driving.distanceKm,
       fare: DEFAULT_TRANSIT_FARE_PER_LEG,
+      hasMetro: false,
     };
   }
 
@@ -176,11 +183,14 @@ function calculateTravelQuote(destination) {
   const oneWayMinutes = transit.minutes * TRANSIT_WEIGHT + driving.minutes * CAR_WEIGHT;
   const roundTripMinutes = Math.round(oneWayMinutes * 2);
   const timeCost = roundTripMinutes / 60 * TRAVEL_TIME_HOURLY_RATE;
-  const surcharge = Math.max(0, Math.round((transportCost + timeCost) / 500) * 500);
+  const rawSurcharge = Math.max(0, Math.round((transportCost + timeCost) / 500) * 500);
+  const isFarWithoutMetro = !transit.hasMetro && (driving.distanceKm >= 15 || oneWayMinutes >= 55);
 
   return {
-    surcharge,
+    rawSurcharge,
+    surcharge: rawSurcharge,
     roundTripMinutes,
+    minimumDuration: isFarWithoutMetro ? 120 : 60,
     transportCost: Math.round(transportCost / 100) * 100,
     timeCost: Math.round(timeCost / 100) * 100,
   };
@@ -203,7 +213,24 @@ function getRouteEstimate(origin, destination, mode, departure) {
     minutes: Math.max(1, Math.round(leg.duration.value / 60)),
     distanceKm: leg.distance.value / 1000,
     fare: route.fare && route.fare.value ? Number(route.fare.value) : 0,
+    hasMetro: routeUsesMetro(leg),
   };
+}
+
+function routeUsesMetro(leg) {
+  let minutesBeforeMetro = 0;
+  for (const step of (leg.steps || [])) {
+    const vehicle = step.transit_details &&
+      step.transit_details.line &&
+      step.transit_details.line.vehicle;
+    const type = String(vehicle && vehicle.type || "").toUpperCase();
+    const name = String(vehicle && (vehicle.name || vehicle.short_name) || "").toLowerCase();
+    const isMetro = ["SUBWAY", "METRO_RAIL", "HEAVY_RAIL", "RAIL"].indexOf(type) >= 0 ||
+      name.indexOf("metro") >= 0;
+    if (isMetro) return minutesBeforeMetro <= 20;
+    minutesBeforeMetro += Number(step.duration && step.duration.value || 0) / 60;
+  }
+  return false;
 }
 
 /**
@@ -222,6 +249,22 @@ function buildBusySlots(events, date) {
     if (event.isAllDayEvent()) {
       if (eventEndDate <= date) return;
       slots.push({ start: "00:00", end: "23:59", reason: isEvaluation ? "evaluation" : "event" });
+      return;
+    }
+
+    const classTravelMinutes = getHomeClassTravelMinutes(event);
+    if (classTravelMinutes > 0) {
+      const oneWayMinutes = Math.ceil(classTravelMinutes / 2);
+      const blockedStart = new Date(eventStart.getTime() - oneWayMinutes * 60 * 1000);
+      const blockedEnd = new Date(eventEnd.getTime() + oneWayMinutes * 60 * 1000);
+      const blockedStartDate = Utilities.formatDate(blockedStart, TIMEZONE, "yyyy-MM-dd");
+      const blockedEndDate = Utilities.formatDate(blockedEnd, TIMEZONE, "yyyy-MM-dd");
+      if (blockedEndDate < date || blockedStartDate > date) return;
+      slots.push({
+        start: blockedStartDate < date ? "00:00" : Utilities.formatDate(blockedStart, TIMEZONE, "HH:mm"),
+        end: blockedEndDate > date ? "23:59" : Utilities.formatDate(blockedEnd, TIMEZONE, "HH:mm"),
+        reason: "home-class-travel",
+      });
       return;
     }
 
@@ -245,6 +288,13 @@ function buildBusySlots(events, date) {
     });
   });
   return mergeBusySlots(slots);
+}
+
+function getHomeClassTravelMinutes(event) {
+  if (String(event.getTitle() || "").indexOf("Clase de ") !== 0) return 0;
+  const details = parseDescription(event.getDescription() || "");
+  if (details.Modalidad !== "A domicilio") return 0;
+  return Number(String(details["Tiempo traslado estimado"] || "").replace(/[^\d]/g, "")) || 0;
 }
 
 function isEvaluationEvent(title) {
