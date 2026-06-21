@@ -54,6 +54,7 @@ Con la integración activa:
   La detección ignora mayúsculas, minúsculas y tildes.
 - Una reserva vuelve a comprobar conflictos antes de guardarse.
 - Se crea el evento en tu calendario.
+- Recibes un correo inmediato con el detalle de cada nueva reserva.
 - Se invita automáticamente al correo del alumno.
 - Para clases online se crea un enlace de Google Meet.
 - Todas las clases nuevas se crean con color amarillo en Google Calendar.

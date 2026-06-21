@@ -134,12 +134,13 @@ function addMemberEmail(value = "") {
   row.innerHTML = `
     <div class="input-wrap">
       <svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m4 7 8 6 8-6"/></svg>
-      <input class="member-email" type="email" placeholder="integrante@gmail.com" value="${value}">
+      <input class="member-email" name="groupEmail[]" type="email" autocomplete="email" placeholder="integrante@gmail.com" value="${value}">
     </div>
     <button type="button" class="remove-member" aria-label="Eliminar correo">
       <svg viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18"/></svg>
     </button>`;
   $("#memberEmailList").append(row);
+  syncMemberEmailRequirements();
 }
 
 function groupEmails() {
@@ -147,6 +148,14 @@ function groupEmails() {
   return [...new Set($$(".member-email", $("#memberEmailList"))
     .map(input => input.value.trim().toLowerCase())
     .filter(email => email && email !== mainEmail))];
+}
+
+function syncMemberEmailRequirements() {
+  const inputs = $$(".member-email", $("#memberEmailList"));
+  inputs.forEach((input, index) => {
+    input.required = formData().classType === "Grupal" && index === 0;
+    input.setAttribute("aria-label", index === 0 ? "Correo obligatorio del segundo integrante" : `Correo del integrante ${index + 2}`);
+  });
 }
 
 async function ensureTravelQuote() {
@@ -269,11 +278,20 @@ function validateStep(step) {
   if (step === 3 && formData().classType === "Grupal") {
     const inputs = $$(".member-email", $("#memberEmailList"));
     const emails = groupEmails();
-    const invalidEmail = inputs.some(input => input.value.trim() && !input.checkValidity());
-    if (!emails.length || invalidEmail) {
+    const mainEmail = formData().email.trim().toLowerCase();
+    const filledValues = inputs.map(input => input.value.trim().toLowerCase()).filter(Boolean);
+    const invalidInput = inputs.find(input => input.value.trim() && !input.validity.valid);
+    const repeatedMainEmail = filledValues.includes(mainEmail);
+    const hasDuplicates = new Set(filledValues).size !== filledValues.length;
+    if (!emails.length || invalidInput || repeatedMainEmail || hasDuplicates) {
       $("#memberEmailsError").textContent = !emails.length
-        ? "Agrega al menos un correo para la clase grupal."
-        : "Revisa que todos los correos sean válidos.";
+        ? "Ingresa al menos el correo de otro integrante."
+        : invalidInput
+          ? "Revisa que el correo ingresado sea válido."
+          : repeatedMainEmail
+            ? "El correo principal no debe repetirse entre los integrantes."
+            : "No repitas correos entre los integrantes.";
+      (invalidInput || inputs[0])?.focus();
       valid = false;
     }
   }
@@ -521,6 +539,7 @@ $("#memberEmailList").addEventListener("click", event => {
   if (!remove) return;
   remove.closest(".member-email-row").remove();
   if (!$(".member-email", $("#memberEmailList"))) addMemberEmail();
+  syncMemberEmailRequirements();
   $("#memberEmailsError").textContent = "";
 });
 $("#memberEmailList").addEventListener("input", () => {

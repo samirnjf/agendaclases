@@ -139,17 +139,57 @@ function doPost(e) {
       conferenceDataVersion: data.createMeet ? 1 : 0,
       sendUpdates: "all",
     });
+    const notificationSent = sendNewBookingNotification(data, event);
 
     return jsonResponse({
       success: true,
       eventId: event.id,
       eventUrl: event.htmlLink,
       meetUrl: event.hangoutLink || "",
+      notificationSent,
     });
   } catch (error) {
     return jsonResponse({ success: false, error: error.message });
   } finally {
     lock.releaseLock();
+  }
+}
+
+function sendNewBookingNotification(data, event) {
+  if (!OWNER_EMAIL || OWNER_EMAIL === "TU_CORREO@gmail.com") return false;
+  try {
+    const groupLine = data.groupEmails && data.groupEmails.length
+      ? `Integrantes: ${data.groupEmails.join(", ")}`
+      : "";
+    const body = [
+      "Se agendó una nueva clase en ClaseLista.",
+      "",
+      `Estudiante: ${data.name}`,
+      `Correo: ${data.email}`,
+      data.phone ? `Teléfono: ${data.phone}` : "",
+      groupLine,
+      `Ramo: ${data.subject}`,
+      `Carrera/curso: ${data.course}`,
+      `Fecha: ${data.date}`,
+      `Horario: ${data.start} a ${data.end}`,
+      `Modalidad: ${data.modality}`,
+      `Tipo: ${data.classType || "Individual"}`,
+      `Lugar: ${data.location}`,
+      data.topic ? `Contenido: ${data.topic}` : "",
+      data.referral ? `Recomendado por: ${data.referral}` : "",
+      `Valor total: $${Number(data.price).toLocaleString("es-CL")}`,
+      "",
+      event.htmlLink ? `Abrir en Google Calendar: ${event.htmlLink}` : "",
+    ].filter(Boolean).join("\n");
+    MailApp.sendEmail(
+      OWNER_EMAIL,
+      `Nueva clase: ${data.subject} con ${data.name} · ${data.date}`,
+      body,
+    );
+    return true;
+  } catch (error) {
+    console.error(`No se pudo enviar la notificación de reserva: ${error.message}`);
+    return false;
   }
 }
 
