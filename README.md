@@ -40,8 +40,9 @@ Antes de utilizarlo:
 Con la integración activa:
 
 - La disponibilidad excluye eventos existentes de tu Google Calendar.
-- Los eventos cuyo título incluya prueba, evaluación, examen, control o certamen
-  bloquean desde las 07:00 hasta una hora después de su término.
+- Los eventos cuyo título incluya prueba, evaluación, examen, control, certamen
+  o presentación bloquean desde las 07:00 hasta una hora después de su término.
+  La detección ignora mayúsculas, minúsculas y tildes.
 - Una reserva vuelve a comprobar conflictos antes de guardarse.
 - Se crea el evento en tu calendario.
 - Se invita automáticamente al correo del alumno.
