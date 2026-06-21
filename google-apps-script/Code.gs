@@ -101,7 +101,8 @@ function doPost(e) {
     data.price = basePrice + data.travelSurcharge;
 
     const start = new Date(`${data.date}T${data.start}:00`);
-    const end = new Date(`${data.date}T${data.end}:00`);
+    const end = new Date(start.getTime() + Number(data.duration) * 60 * 1000);
+    data.end = Utilities.formatDate(end, TIMEZONE, "HH:mm");
     const calendar = CalendarApp.getCalendarById(CALENDAR_ID);
     const dayStart = new Date(`${data.date}T00:00:00`);
     const searchStart = new Date(dayStart.getTime() - 24 * 60 * 60 * 1000);
@@ -111,7 +112,7 @@ function doPost(e) {
       ? Math.ceil(travelQuote.roundTripMinutes / 2)
       : 0;
     const requestedStart = timeToMinutes(data.start) - oneWayTravelMinutes;
-    const requestedEnd = timeToMinutes(data.end) + oneWayTravelMinutes;
+    const requestedEnd = timeToMinutes(data.start) + Number(data.duration) + oneWayTravelMinutes;
     const hasConflict = busySlots.some(slot =>
       timeToMinutes(slot.start) < requestedEnd &&
       timeToMinutes(slot.end) > requestedStart
@@ -633,6 +634,10 @@ function validateBooking(data) {
     if (!data[field]) throw new Error(`Falta el campo ${field}.`);
   });
   requireDate(data.date);
+  const duration = Number(data.duration);
+  if ([60, 90, 120].indexOf(duration) < 0) {
+    throw new Error("La duración de la clase no es válida.");
+  }
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email)) throw new Error("El correo no es válido.");
   if (data.classType === "Grupal") {
     if (!Array.isArray(data.groupEmails) || !data.groupEmails.length) {

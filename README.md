@@ -5,6 +5,9 @@ Flujo público para que estudiantes reserven una clase según nivel, carrera, ra
 El estudiante puede seleccionar y confirmar varias fechas en una sola reserva. Cada clase
 se valida por separado y genera su propio evento e invitación de Google Calendar.
 
+La duración se recalcula y valida también en el servidor. Una clase de dos horas bloquea
+las dos horas completas en Google Calendar y no permite reservas que se superpongan.
+
 ## Ejecutar localmente
 
 ```bash
