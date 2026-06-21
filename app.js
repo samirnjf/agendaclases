@@ -105,7 +105,12 @@ async function loadBookingSettings() {
 }
 
 function initializeCareers() {
-  $("#careerSelect").insertAdjacentHTML("beforeend", Object.keys(CAREERS).map(career => `<option>${career}</option>`).join(""));
+  const select = $("#careerSelect");
+  const existing = new Set([...select.options].map(option => option.value));
+  Object.keys(CAREERS).forEach(career => {
+    if (existing.has(career)) return;
+    select.add(new Option(career, career));
+  });
 }
 
 function updateSubjects() {
@@ -121,10 +126,10 @@ function updateLevelFields() {
   const level = formData().level;
   $("#schoolFields").hidden = level !== "Colegio";
   $("#universityFields").hidden = level !== "Universidad";
-  form.schoolGrade.required = level === "Colegio";
-  form.schoolSubject.required = level === "Colegio";
-  form.career.required = level === "Universidad";
-  form.subject.required = level === "Universidad";
+  $('[name="schoolGrade"]').required = level === "Colegio";
+  $('[name="schoolSubject"]').required = level === "Colegio";
+  $("#careerSelect").required = level === "Universidad";
+  $("#subjectSelect").required = level === "Universidad";
 }
 
 function updateModality() {
@@ -643,6 +648,8 @@ form.addEventListener("change", event => {
     if (error) error.textContent = "";
   }
 });
+$$('input[name="level"]').forEach(input => input.addEventListener("change", updateLevelFields));
+$("#careerSelect").addEventListener("change", updateSubjects);
 form.homeLocation.addEventListener("input", () => {
   state.travelQuote = null;
   state.quotedAddress = "";

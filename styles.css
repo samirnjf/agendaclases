@@ -87,6 +87,7 @@ svg { display: block; fill: none; stroke: currentColor; stroke-linecap: round; s
 input::placeholder, textarea::placeholder { color: #b1adb7; }
 .field select, .field textarea { width: 100%; border: 1px solid #d7d4da; border-radius: 5px; outline: 0; color: var(--ink); background: #fff; font-size: 12px; }
 .field select { height: 43px; padding: 0 11px; }
+.field select:disabled { color:#716d76; opacity:.65; cursor:not-allowed; }
 .field textarea { padding: 11px; resize: vertical; }
 .field select:focus, .field textarea:focus { border-color: #625778; box-shadow: 0 0 0 2px rgba(73,61,117,.08); }
 .field-error, .group-error, .schedule-error, .terms-error { min-height: 11px; color: var(--danger); font-size: 9px; }
