@@ -1,0 +1,152 @@
+const ADMIN_CONFIG = {
+  apiUrl: "https://script.google.com/macros/s/AKfycbx15WaCNvIYEGHdEWDXMcMTU43iSBpXWJGLaun25BM-6zo5dukO3tU0P_AISENQBxpg/exec",
+};
+
+const $ = (selector, root = document) => root.querySelector(selector);
+const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
+const currency = new Intl.NumberFormat("es-CL", { style: "currency", currency: "CLP", maximumFractionDigits: 0 });
+const dateFormat = new Intl.DateTimeFormat("es-CL", { day: "2-digit", month: "short", year: "numeric" });
+const dateTimeFormat = new Intl.DateTimeFormat("es-CL", { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+let report = null;
+let adminKey = sessionStorage.getItem("claseListaAdminKey") || "";
+
+async function api(payload) {
+  const response = await fetch(ADMIN_CONFIG.apiUrl, {
+    method: "POST",
+    headers: { "Content-Type": "text/plain;charset=utf-8" },
+    body: JSON.stringify({ ...payload, adminKey }),
+  });
+  const result = await response.json();
+  if (!result.success) throw new Error(result.error || "No fue posible consultar el panel.");
+  return result;
+}
+
+async function loadReport() {
+  $("#loading").hidden = false;
+  $("#content").hidden = true;
+  try {
+    report = await api({ action: "adminReport" });
+    sessionStorage.setItem("claseListaAdminKey", adminKey);
+    $("#loginScreen").hidden = true;
+    $("#dashboard").hidden = false;
+    renderAll();
+    $("#loading").hidden = true;
+    $("#content").hidden = false;
+  } catch (error) {
+    sessionStorage.removeItem("claseListaAdminKey");
+    $("#dashboard").hidden = true;
+    $("#loginScreen").hidden = false;
+    $("#loginError").textContent = error.message;
+  }
+}
+
+function renderAll() {
+  renderMetrics();
+  renderOverview();
+  renderTable("upcomingTable", report.upcoming);
+  renderTable("historyTable", report.history);
+  renderClients(report.frequent);
+}
+
+function renderMetrics() {
+  const m = report.metrics;
+  const items = [
+    ["Clientes actuales", m.activeClients, `${m.totalClients} clientes históricos`, ""],
+    ["Próximas clases", m.upcomingClasses, `${m.completedClasses} clases realizadas`, ""],
+    ["Ingresos esperados", currency.format(m.totalExpected), `${currency.format(m.totalPending)} aún pendientes`, "money"],
+    ["Ingresos pagados", currency.format(m.totalPaid), `${currency.format(m.overdueAmount)} vencidos`, m.overdueAmount ? "warning" : "money"],
+  ];
+  $("#metrics").innerHTML = items.map(([label, value, note, type]) => `<article class="metric ${type}"><span>${label}</span><strong>${value}</strong><small>${note}</small></article>`).join("");
+}
+
+function renderOverview() {
+  $("#overviewUpcoming").innerHTML = report.upcoming.length
+    ? report.upcoming.slice(0, 5).map(classRow).join("")
+    : empty("No hay próximas clases.");
+  $("#overviewFrequent").innerHTML = report.frequent.length
+    ? report.frequent.slice(0, 5).map((client, index) => `<div class="frequent-row"><span class="rank">${index + 1}</span><div class="client-copy"><strong>${escapeHtml(client.name)}</strong><span>${escapeHtml(client.email)}</span></div><strong>${client.classes} clases</strong></div>`).join("")
+    : empty("Todavía no hay clientes.");
+}
+
+function classRow(item) {
+  const date = new Date(item.start);
+  return `<div class="class-row"><span class="date-block"><strong>${date.getDate()}</strong><span>${new Intl.DateTimeFormat("es-CL",{month:"short"}).format(date)}</span></span><div class="class-copy"><strong>${escapeHtml(item.name)}</strong><span>${escapeHtml(item.subject)} · ${escapeHtml(item.modality)}</span></div><span class="class-meta">${new Intl.DateTimeFormat("es-CL",{hour:"2-digit",minute:"2-digit"}).format(date)}</span><span class="status ${item.paid ? "paid" : ""}">${item.paid ? "Pagada" : "Pendiente"}</span></div>`;
+}
+
+function renderTable(target, items) {
+  const container = $(`#${target}`);
+  if (!items.length) {
+    container.innerHTML = empty("No hay clases para mostrar.");
+    return;
+  }
+  container.innerHTML = `<table><thead><tr><th>Fecha</th><th>Cliente</th><th>Clase</th><th>Modalidad</th><th>Valor</th><th>Pago</th><th></th></tr></thead><tbody>${items.map(item => `<tr data-searchable="${escapeHtml(`${item.name} ${item.email} ${item.subject}`.toLowerCase())}"><td><strong>${dateTimeFormat.format(new Date(item.start))}</strong><small>${item.classType}</small></td><td><strong>${escapeHtml(item.name)}</strong><small>${escapeHtml(item.email)}</small></td><td><strong>${escapeHtml(item.subject)}</strong><small>${escapeHtml(item.course)}</small></td><td>${escapeHtml(item.modality)}</td><td><strong>${currency.format(item.price)}</strong></td><td><button class="payment-button ${item.paid ? "paid" : ""}" data-payment-id="${item.id}" data-paid="${item.paid}">${item.paid ? "Pagada" : "Pendiente"}</button></td><td>${item.eventUrl ? `<a class="event-link" href="${item.eventUrl}" target="_blank">Abrir ↗</a>` : ""}</td></tr>`).join("")}</tbody></table>`;
+}
+
+function renderClients(clients) {
+  $("#clientGrid").innerHTML = clients.length
+    ? clients.map((client, index) => `<article class="client-card" data-searchable="${escapeHtml(`${client.name} ${client.email}`.toLowerCase())}"><div class="client-top"><span class="avatar">${initials(client.name)}</span><div class="client-copy"><strong>${escapeHtml(client.name)}</strong><span>${escapeHtml(client.email)}</span></div><span class="rank">#${index + 1}</span></div><div class="client-stats"><div><span>Clases</span><strong>${client.classes}</strong></div><div><span>Pagadas</span><strong>${client.paidClasses}</strong></div><div><span>Esperado</span><strong>${currency.format(client.totalExpected)}</strong></div></div></article>`).join("")
+    : empty("Todavía no hay clientes.");
+}
+
+function showSection(section) {
+  const titles = { overview: "Resumen", upcoming: "Próximas clases", history: "Historial", clients: "Clientes frecuentes" };
+  $$(".page-section").forEach(page => page.classList.toggle("active", page.dataset.page === section));
+  $$("[data-section]").forEach(button => button.classList.toggle("active", button.dataset.section === section));
+  $("#sectionTitle").textContent = titles[section];
+}
+
+function empty(message) {
+  return `<div class="empty">${message}</div>`;
+}
+
+function escapeHtml(value = "") {
+  return value.replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;").replaceAll('"',"&quot;").replaceAll("'","&#039;");
+}
+
+function initials(name = "") {
+  return name.split(/\s+/).slice(0,2).map(part => part[0]).join("").toUpperCase() || "CL";
+}
+
+let toastTimer;
+function toast(message) {
+  $("#toast").textContent = message;
+  $("#toast").classList.add("visible");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => $("#toast").classList.remove("visible"), 2400);
+}
+
+$("#loginForm").addEventListener("submit", event => {
+  event.preventDefault();
+  adminKey = $("#adminKey").value;
+  $("#loginError").textContent = "";
+  loadReport();
+});
+$("#refreshButton").addEventListener("click", loadReport);
+$("#logoutButton").addEventListener("click", () => {
+  sessionStorage.removeItem("claseListaAdminKey");
+  location.reload();
+});
+document.addEventListener("click", async event => {
+  const section = event.target.closest("[data-section]")?.dataset.section || event.target.closest("[data-go]")?.dataset.go;
+  if (section) showSection(section);
+  const payment = event.target.closest("[data-payment-id]");
+  if (payment) {
+    payment.disabled = true;
+    try {
+      await api({ action: "updatePayment", eventId: payment.dataset.paymentId, paid: payment.dataset.paid !== "true" });
+      toast("Estado de pago actualizado");
+      await loadReport();
+    } catch (error) {
+      toast(error.message);
+      payment.disabled = false;
+    }
+  }
+});
+$$("[data-search]").forEach(input => input.addEventListener("input", event => {
+  const query = event.target.value.toLowerCase().trim();
+  const page = event.target.dataset.search;
+  const root = $(`[data-page="${page}"]`);
+  $$("[data-searchable]", root).forEach(item => item.hidden = !item.dataset.searchable.includes(query));
+}));
+
+if (adminKey) loadReport();

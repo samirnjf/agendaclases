@@ -12,6 +12,8 @@ const CALENDAR_ID = "primary";
 const TIMEZONE = "America/Santiago";
 const FIRST_START_HOUR = 7;
 const LAST_START_HOUR = 22;
+// Cambia esta clave antes de desplegar. Se usará para entrar al panel privado.
+const ADMIN_KEY = "CAMBIA-ESTA-CLAVE-PRIVADA";
 
 function doGet(e) {
   try {
@@ -37,6 +39,15 @@ function doPost(e) {
   try {
     lock.waitLock(10000);
     const data = JSON.parse(e.postData.contents);
+    if (data.action === "adminReport") {
+      requireAdmin(data.adminKey);
+      return jsonResponse(buildAdminReport());
+    }
+    if (data.action === "updatePayment") {
+      requireAdmin(data.adminKey);
+      updatePaymentStatus(data.eventId, data.paid);
+      return jsonResponse({ success: true });
+    }
     validateBooking(data);
 
     const start = new Date(`${data.date}T${data.start}:00`);
@@ -98,6 +109,132 @@ function doPost(e) {
   } finally {
     lock.releaseLock();
   }
+}
+
+function requireAdmin(key) {
+  if (ADMIN_KEY === "CAMBIA-ESTA-CLAVE-PRIVADA") {
+    throw new Error("Primero configura ADMIN_KEY en Código.gs.");
+  }
+  if (!key || key !== ADMIN_KEY) throw new Error("Clave administrativa incorrecta.");
+}
+
+function buildAdminReport() {
+  const now = new Date();
+  const from = new Date(now);
+  from.setFullYear(from.getFullYear() - 3);
+  const until = new Date(now);
+  until.setFullYear(until.getFullYear() + 2);
+
+  const events = [];
+  let pageToken;
+  do {
+    const result = Calendar.Events.list(CALENDAR_ID, {
+      timeMin: from.toISOString(),
+      timeMax: until.toISOString(),
+      singleEvents: true,
+      orderBy: "startTime",
+      maxResults: 2500,
+      pageToken,
+    });
+    (result.items || []).forEach(event => {
+      if ((event.summary || "").indexOf("Clase de ") !== 0) return;
+      events.push(adminEvent(event, now));
+    });
+    pageToken = result.nextPageToken;
+  } while (pageToken);
+
+  const clientsByEmail = {};
+  events.forEach(event => {
+    if (!event.email) return;
+    if (!clientsByEmail[event.email]) {
+      clientsByEmail[event.email] = {
+        email: event.email,
+        name: event.name,
+        phone: event.phone,
+        classes: 0,
+        paidClasses: 0,
+        totalExpected: 0,
+        totalPaid: 0,
+        lastClass: "",
+        nextClass: "",
+      };
+    }
+    const client = clientsByEmail[event.email];
+    client.classes += 1;
+    client.totalExpected += event.price;
+    if (event.paid) {
+      client.paidClasses += 1;
+      client.totalPaid += event.price;
+    }
+    if (event.isPast && (!client.lastClass || event.start > client.lastClass)) client.lastClass = event.start;
+    if (!event.isPast && (!client.nextClass || event.start < client.nextClass)) client.nextClass = event.start;
+  });
+
+  const clients = Object.keys(clientsByEmail).map(email => clientsByEmail[email]);
+  const upcoming = events.filter(event => !event.isPast);
+  const history = events.filter(event => event.isPast).reverse();
+  const totalExpected = events.reduce((sum, event) => sum + event.price, 0);
+  const totalPaid = events.filter(event => event.paid).reduce((sum, event) => sum + event.price, 0);
+  const pendingPast = history.filter(event => !event.paid).reduce((sum, event) => sum + event.price, 0);
+
+  return {
+    success: true,
+    generatedAt: now.toISOString(),
+    metrics: {
+      activeClients: clients.filter(client => client.nextClass).length,
+      totalClients: clients.length,
+      upcomingClasses: upcoming.length,
+      completedClasses: history.length,
+      totalExpected,
+      totalPaid,
+      totalPending: totalExpected - totalPaid,
+      overdueAmount: pendingPast,
+    },
+    upcoming,
+    history,
+    frequent: clients.sort((a, b) => b.classes - a.classes || b.totalExpected - a.totalExpected).slice(0, 10),
+  };
+}
+
+function adminEvent(event, now) {
+  const details = parseDescription(event.description || "");
+  const start = new Date(event.start.dateTime || event.start.date);
+  const end = new Date(event.end.dateTime || event.end.date);
+  const price = Number((details.Valor || "0").replace(/[^\d]/g, "")) || 0;
+  const paid = PropertiesService.getScriptProperties().getProperty(`paid:${event.id}`) === "true";
+  return {
+    id: event.id,
+    title: event.summary || "",
+    name: details.Estudiante || "",
+    email: (details.Correo || "").toLowerCase(),
+    phone: details["Teléfono"] || "",
+    subject: details.Ramo || "",
+    course: details["Carrera/curso"] || "",
+    modality: details.Modalidad || "",
+    classType: details["Tipo de clase"] || "Individual",
+    referral: details["Recomendado por"] || "",
+    location: details.Lugar || event.location || "",
+    start: start.toISOString(),
+    end: end.toISOString(),
+    price,
+    paid,
+    isPast: end < now,
+    eventUrl: event.htmlLink || "",
+  };
+}
+
+function parseDescription(description) {
+  return description.split("\n").reduce((result, line) => {
+    const separator = line.indexOf(":");
+    if (separator < 0) return result;
+    result[line.slice(0, separator).trim()] = line.slice(separator + 1).trim();
+    return result;
+  }, {});
+}
+
+function updatePaymentStatus(eventId, paid) {
+  if (!eventId) throw new Error("Falta el identificador de la clase.");
+  PropertiesService.getScriptProperties().setProperty(`paid:${eventId}`, paid ? "true" : "false");
 }
 
 function validateBooking(data) {

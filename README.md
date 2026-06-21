@@ -23,6 +23,18 @@ La interfaz funciona en modo demostración hasta conectar una cuenta:
 7. Autoriza el acceso y copia la URL que termina en `/exec`.
 8. Pega esa URL en `CONFIG.calendarApiUrl` al inicio de `app.js`.
 
+## Panel administrativo privado
+
+El panel se encuentra en `/admin.html` y muestra clientes, próximas clases, historial,
+frecuencia, pagos e ingresos esperados.
+
+Antes de utilizarlo:
+
+1. Cambia `ADMIN_KEY` en `google-apps-script/Code.gs` por una clave larga y privada.
+2. Copia nuevamente `Code.gs` en Google Apps Script.
+3. Crea una nueva versión de la implementación.
+4. Entra al panel con esa clave. La clave solo se conserva durante la sesión del navegador.
+
 Con la integración activa:
 
 - La disponibilidad excluye eventos existentes de tu Google Calendar.

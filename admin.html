@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex,nofollow" />
+    <title>ClaseLista · Panel privado</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@600;700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="admin.css" />
+  </head>
+  <body>
+    <div class="login-screen" id="loginScreen">
+      <form class="login-card" id="loginForm">
+        <span class="logo"><svg viewBox="0 0 24 24"><path d="M4 6.5 12 3l8 3.5-8 3.5-8-3.5Z"/><path d="M7 9v5.5c2.8 2.2 7.2 2.2 10 0V9M20 7v6"/></svg></span>
+        <span class="eyebrow">ClaseLista</span>
+        <h1>Panel privado</h1>
+        <p>Ingresa tu clave para ver clientes, clases, pagos e ingresos.</p>
+        <label><span>Clave administrativa</span><input id="adminKey" type="password" required autocomplete="current-password" placeholder="Tu clave privada" /></label>
+        <small id="loginError"></small>
+        <button type="submit">Entrar</button>
+      </form>
+    </div>
+
+    <div class="dashboard" id="dashboard" hidden>
+      <aside class="sidebar">
+        <a class="brand" href="index.html"><span class="logo"><svg viewBox="0 0 24 24"><path d="M4 6.5 12 3l8 3.5-8 3.5-8-3.5Z"/><path d="M7 9v5.5c2.8 2.2 7.2 2.2 10 0V9M20 7v6"/></svg></span><span>ClaseLista</span></a>
+        <nav>
+          <button class="active" data-section="overview"><svg viewBox="0 0 24 24"><path d="M4 13h6V4H4v9ZM14 20h6v-9h-6v9ZM4 20h6v-3H4v3ZM14 7h6V4h-6v3Z"/></svg>Resumen</button>
+          <button data-section="upcoming"><svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="15" rx="2"/><path d="M8 3v4M16 3v4M4 9h16"/></svg>Próximas clases</button>
+          <button data-section="history"><svg viewBox="0 0 24 24"><path d="M4 12a8 8 0 1 0 2-5.3M4 4v5h5"/><path d="M12 8v5l3 2"/></svg>Historial</button>
+          <button data-section="clients"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3"/><circle cx="17" cy="10" r="2.5"/><path d="M3.5 19a5.5 5.5 0 0 1 11 0M14 15a4.5 4.5 0 0 1 6.5 4"/></svg>Clientes frecuentes</button>
+        </nav>
+        <div class="sidebar-bottom">
+          <a href="index.html" target="_blank">Ver página pública ↗</a>
+          <button id="logoutButton">Cerrar sesión</button>
+        </div>
+      </aside>
+
+      <main>
+        <header>
+          <div><span class="eyebrow">Administración</span><h1 id="sectionTitle">Resumen</h1></div>
+          <button class="refresh" id="refreshButton"><svg viewBox="0 0 24 24"><path d="M20 11a8 8 0 1 0-2 5.5M20 5v6h-6"/></svg>Actualizar</button>
+        </header>
+
+        <div class="loading" id="loading"><i></i><span>Consultando Google Calendar...</span></div>
+        <div id="content" hidden>
+          <section class="page-section active" data-page="overview">
+            <div class="metrics" id="metrics"></div>
+            <div class="overview-grid">
+              <article class="panel"><div class="panel-heading"><div><span class="eyebrow">Agenda</span><h2>Próximas clases</h2></div><button data-go="upcoming">Ver todas</button></div><div id="overviewUpcoming"></div></article>
+              <article class="panel"><div class="panel-heading"><div><span class="eyebrow">Clientes</span><h2>Más frecuentes</h2></div><button data-go="clients">Ver todos</button></div><div id="overviewFrequent"></div></article>
+            </div>
+          </section>
+          <section class="page-section" data-page="upcoming">
+            <div class="section-toolbar"><p>Clases que todavía no se han realizado.</p><input class="search" data-search="upcoming" placeholder="Buscar cliente o ramo..." /></div>
+            <div class="panel table-panel"><div id="upcomingTable"></div></div>
+          </section>
+          <section class="page-section" data-page="history">
+            <div class="section-toolbar"><p>Clases realizadas y estado de sus pagos.</p><input class="search" data-search="history" placeholder="Buscar cliente o ramo..." /></div>
+            <div class="panel table-panel"><div id="historyTable"></div></div>
+          </section>
+          <section class="page-section" data-page="clients">
+            <div class="section-toolbar"><p>Ordenados por cantidad total de clases.</p><input class="search" data-search="clients" placeholder="Buscar cliente..." /></div>
+            <div class="client-grid" id="clientGrid"></div>
+          </section>
+        </div>
+      </main>
+    </div>
+    <div class="toast" id="toast"></div>
+    <script src="admin.js"></script>
+  </body>
+</html>
