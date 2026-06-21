@@ -329,6 +329,81 @@ input::placeholder, textarea::placeholder { color: #b1adb7; }
   *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; transition-duration: .01ms !important; }
 }
 
+/* Escala de lectura amplia */
+.hero > div > p { font-size:16px; }
+.trust-row { font-size:12px; }
+.steps-intro span, .eyebrow, .step-kicker { font-size:11px; }
+.steps-intro strong { font-size:15px; }
+.steps { gap:25px; }
+.steps i { width:38px; height:38px; font-size:12px; }
+.steps::before { left:19px; }
+.steps strong { font-size:13px; }
+.steps span { font-size:11px; }
+.secure-note strong { font-size:11px; }
+.secure-note span { font-size:10px; }
+.step-heading h2 { font-size:27px; }
+.step-heading p { font-size:14px; line-height:1.5; }
+.field > span, .choice-group legend { font-size:13px; }
+.field > span b { font-size:11px; }
+.input-wrap { height:56px; }
+.input-wrap input, .input-wrap select, .field select, .field textarea { font-size:15px; }
+.field select { height:56px; }
+.field textarea { padding:14px; }
+.choice-card { min-height:108px; padding:20px; gap:16px; }
+.choice-icon { width:52px; height:52px; }
+.choice-icon svg { width:26px; }
+.choice-card strong { font-size:16px; }
+.choice-card small { margin-top:3px; font-size:12px; line-height:1.35; }
+.choice-card.vertical { min-height:150px; }
+.check { width:20px; height:20px; }
+.check::after { font-size:12px; }
+.conditional-fields { padding:23px; }
+.duration-grid span { min-height:90px; }
+.duration-grid strong { font-size:15px; }
+.duration-grid small, .price-note { font-size:12px; }
+.group-members-heading strong { font-size:13px; }
+.group-members-heading span, .group-members-heading button { font-size:11px; }
+.member-email-row .input-wrap { height:48px; }
+.important-notice { padding:14px; font-size:14px; }
+.important-notice strong { font-size:11px; }
+.calendar-header strong { font-size:15px; }
+.weekdays span { font-size:10px; }
+.calendar-day { width:40px; height:40px; font-size:13px; }
+.calendar-legend, .availability-status { font-size:11px; }
+.time-heading span { font-size:10px; }
+.time-heading strong { font-size:13px; }
+.time-slot { height:42px; font-size:12px; }
+.multi-booking-bar strong, .selected-sessions-heading strong { font-size:12px; }
+.multi-booking-bar span, .selected-session span, .selected-sessions-heading span { font-size:10px; }
+.multi-booking-bar button { height:38px; font-size:10px; }
+.selected-session strong { font-size:12px; }
+.summary-main > div > span { font-size:10px; }
+.summary-main h3 { font-size:18px; }
+.summary-main p { font-size:11px; }
+.summary-grid span { font-size:10px; }
+.summary-grid strong { font-size:12px; }
+.summary-total span { font-size:12px; }
+.summary-total small, .terms, .calendar-notice { font-size:10px; }
+.button { height:48px; padding:0 23px; font-size:13px; }
+.form-error, .field-error, .group-error, .schedule-error, .terms-error, .group-members-error { font-size:11px; }
+
+@media (max-width: 650px) {
+  .hero > div > p { font-size:14px; }
+  .step-heading h2 { font-size:23px; }
+  .step-heading p { font-size:12px; }
+  .field > span, .choice-group legend { font-size:12px; }
+  .input-wrap, .field select { height:53px; }
+  .input-wrap input, .input-wrap select, .field select, .field textarea { font-size:14px; }
+  .choice-card, .choice-card.vertical { min-height:90px; padding:16px; }
+  .choice-icon { width:46px; height:46px; }
+  .choice-card strong { font-size:14px; }
+  .choice-card small { font-size:11px; }
+  .duration-grid span { min-height:78px; }
+  .duration-grid strong { font-size:13px; }
+  .duration-grid small { font-size:10px; }
+  .button { height:46px; font-size:12px; }
+}
+
 /* Tema oscuro */
 :root {
   color-scheme: dark;
