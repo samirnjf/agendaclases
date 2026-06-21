@@ -34,6 +34,8 @@ Antes de utilizarlo:
 2. Copia nuevamente `Code.gs` en Google Apps Script.
 3. Crea una nueva versión de la implementación.
 4. Entra al panel con esa clave. La clave solo se conserva durante la sesión del navegador.
+5. Pulsa **Activar recordatorio diario** una sola vez. Apps Script pedirá los permisos
+   necesarios y enviará cada 24 horas un correo con todas las transferencias pendientes.
 
 Con la integración activa:
 

@@ -41,7 +41,10 @@
       <main>
         <header>
           <div><span class="eyebrow">Administración</span><h1 id="sectionTitle">Resumen</h1></div>
-          <button class="refresh" id="refreshButton"><svg viewBox="0 0 24 24"><path d="M20 11a8 8 0 1 0-2 5.5M20 5v6h-6"/></svg>Actualizar</button>
+          <div class="header-actions">
+            <button class="reminder-button" id="reminderButton"><svg viewBox="0 0 24 24"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4"/></svg><span id="reminderLabel">Activar recordatorio diario</span></button>
+            <button class="refresh" id="refreshButton"><svg viewBox="0 0 24 24"><path d="M20 11a8 8 0 1 0-2 5.5M20 5v6h-6"/></svg>Actualizar</button>
+          </div>
         </header>
 
         <div class="loading" id="loading"><i></i><span>Consultando Google Calendar...</span></div>

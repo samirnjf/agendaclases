@@ -48,6 +48,11 @@ function doPost(e) {
       updatePaymentStatus(data.eventId, data.paid);
       return jsonResponse({ success: true });
     }
+    if (data.action === "setupPaymentReminders") {
+      requireAdmin(data.adminKey);
+      setupDailyPaymentReminder();
+      return jsonResponse({ success: true, reminderEnabled: true });
+    }
     validateBooking(data);
 
     const start = new Date(`${data.date}T${data.start}:00`);
@@ -190,6 +195,7 @@ function buildAdminReport() {
       totalPending: totalExpected - totalPaid,
       overdueAmount: pendingPast,
     },
+    reminderEnabled: isPaymentReminderEnabled(),
     upcoming,
     history,
     frequent: clients.sort((a, b) => b.classes - a.classes || b.totalExpected - a.totalExpected).slice(0, 10),
@@ -214,6 +220,7 @@ function adminEvent(event, now) {
     classType: details["Tipo de clase"] || "Individual",
     referral: details["Recomendado por"] || "",
     location: details.Lugar || event.location || "",
+    created: event.created || "",
     start: start.toISOString(),
     end: end.toISOString(),
     price,
@@ -235,6 +242,85 @@ function parseDescription(description) {
 function updatePaymentStatus(eventId, paid) {
   if (!eventId) throw new Error("Falta el identificador de la clase.");
   PropertiesService.getScriptProperties().setProperty(`paid:${eventId}`, paid ? "true" : "false");
+}
+
+/**
+ * Crea un único disparador diario. También puede ejecutarse manualmente
+ * desde el editor de Apps Script.
+ */
+function setupDailyPaymentReminder() {
+  ScriptApp.getProjectTriggers()
+    .filter(trigger => trigger.getHandlerFunction() === "sendDailyPaymentReminder")
+    .forEach(trigger => ScriptApp.deleteTrigger(trigger));
+
+  ScriptApp.newTrigger("sendDailyPaymentReminder")
+    .timeBased()
+    .everyDays(1)
+    .atHour(10)
+    .create();
+}
+
+function isPaymentReminderEnabled() {
+  return ScriptApp.getProjectTriggers()
+    .some(trigger => trigger.getHandlerFunction() === "sendDailyPaymentReminder");
+}
+
+/**
+ * Envía al propietario un resumen diario de todas las clases que continúan
+ * impagas. El correo se repite cada 24 horas hasta marcarlas como pagadas.
+ */
+function sendDailyPaymentReminder() {
+  if (!OWNER_EMAIL || OWNER_EMAIL === "TU_CORREO@gmail.com") {
+    throw new Error("Configura OWNER_EMAIL antes de activar recordatorios.");
+  }
+
+  const now = new Date();
+  const from = new Date(now);
+  from.setDate(from.getDate() - 30);
+  const until = new Date(now);
+  until.setFullYear(until.getFullYear() + 1);
+  const result = Calendar.Events.list(CALENDAR_ID, {
+    timeMin: from.toISOString(),
+    timeMax: until.toISOString(),
+    singleEvents: true,
+    orderBy: "startTime",
+    maxResults: 2500,
+  });
+
+  const unpaid = (result.items || [])
+    .filter(event => (event.summary || "").indexOf("Clase de ") === 0)
+    .map(event => adminEvent(event, now))
+    .filter(event => {
+      if (event.paid) return false;
+      if (!event.created) return true;
+      return now.getTime() - new Date(event.created).getTime() >= 24 * 60 * 60 * 1000;
+    });
+
+  if (!unpaid.length) return;
+
+  const total = unpaid.reduce((sum, event) => sum + event.price, 0);
+  const rows = unpaid.map(event => {
+    const date = Utilities.formatDate(new Date(event.start), TIMEZONE, "dd-MM-yyyy HH:mm");
+    return [
+      `${date} · ${event.name}`,
+      `${event.subject} · $${event.price.toLocaleString("es-CL")}`,
+      `Correo: ${event.email}${event.phone ? ` · Teléfono: ${event.phone}` : ""}`,
+    ].join("\n");
+  });
+
+  const subject = `ClaseLista: ${unpaid.length} ${unpaid.length === 1 ? "pago pendiente" : "pagos pendientes"}`;
+  const body = [
+    "Recordatorio diario de transferencias pendientes",
+    "",
+    rows.join("\n\n"),
+    "",
+    `Total pendiente: $${total.toLocaleString("es-CL")}`,
+    "",
+    "Cuando recibas una transferencia, márcala con ✓ en tu panel privado:",
+    "https://samirnjf.github.io/agendaclases/admin.html",
+  ].join("\n");
+
+  MailApp.sendEmail(OWNER_EMAIL, subject, body);
 }
 
 function validateBooking(data) {

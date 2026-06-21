@@ -41,11 +41,21 @@ async function loadReport() {
 }
 
 function renderAll() {
+  renderReminderStatus();
   renderMetrics();
   renderOverview();
   renderTable("upcomingTable", report.upcoming);
   renderTable("historyTable", report.history);
   renderClients(report.frequent);
+}
+
+function renderReminderStatus() {
+  const button = $("#reminderButton");
+  button.classList.toggle("enabled", report.reminderEnabled);
+  button.disabled = report.reminderEnabled;
+  $("#reminderLabel").textContent = report.reminderEnabled
+    ? "Recordatorio diario activo"
+    : "Activar recordatorio diario";
 }
 
 function renderMetrics() {
@@ -70,7 +80,7 @@ function renderOverview() {
 
 function classRow(item) {
   const date = new Date(item.start);
-  return `<div class="class-row"><span class="date-block"><strong>${date.getDate()}</strong><span>${new Intl.DateTimeFormat("es-CL",{month:"short"}).format(date)}</span></span><div class="class-copy"><strong>${escapeHtml(item.name)}</strong><span>${escapeHtml(item.subject)} · ${escapeHtml(item.modality)}</span></div><span class="class-meta">${new Intl.DateTimeFormat("es-CL",{hour:"2-digit",minute:"2-digit"}).format(date)}</span><span class="status ${item.paid ? "paid" : ""}">${item.paid ? "Pagada" : "Pendiente"}</span></div>`;
+  return `<div class="class-row"><span class="date-block"><strong>${date.getDate()}</strong><span>${new Intl.DateTimeFormat("es-CL",{month:"short"}).format(date)}</span></span><div class="class-copy"><strong>${escapeHtml(item.name)}</strong><span>${escapeHtml(item.subject)} · ${escapeHtml(item.modality)}</span></div><span class="class-meta">${new Intl.DateTimeFormat("es-CL",{hour:"2-digit",minute:"2-digit"}).format(date)}</span><span class="status ${item.paid ? "paid" : ""}">${item.paid ? "✓ Pagada" : "✕ Pendiente"}</span></div>`;
 }
 
 function renderTable(target, items) {
@@ -79,7 +89,7 @@ function renderTable(target, items) {
     container.innerHTML = empty("No hay clases para mostrar.");
     return;
   }
-  container.innerHTML = `<table><thead><tr><th>Fecha</th><th>Cliente</th><th>Clase</th><th>Modalidad</th><th>Valor</th><th>Pago</th><th></th></tr></thead><tbody>${items.map(item => `<tr data-searchable="${escapeHtml(`${item.name} ${item.email} ${item.subject}`.toLowerCase())}"><td><strong>${dateTimeFormat.format(new Date(item.start))}</strong><small>${item.classType}</small></td><td><strong>${escapeHtml(item.name)}</strong><small>${escapeHtml(item.email)}</small></td><td><strong>${escapeHtml(item.subject)}</strong><small>${escapeHtml(item.course)}</small></td><td>${escapeHtml(item.modality)}</td><td><strong>${currency.format(item.price)}</strong></td><td><button class="payment-button ${item.paid ? "paid" : ""}" data-payment-id="${item.id}" data-paid="${item.paid}">${item.paid ? "Pagada" : "Pendiente"}</button></td><td>${item.eventUrl ? `<a class="event-link" href="${item.eventUrl}" target="_blank">Abrir ↗</a>` : ""}</td></tr>`).join("")}</tbody></table>`;
+  container.innerHTML = `<table><thead><tr><th>Fecha</th><th>Cliente</th><th>Clase</th><th>Modalidad</th><th>Valor</th><th>Transferencia</th><th></th></tr></thead><tbody>${items.map(item => `<tr data-searchable="${escapeHtml(`${item.name} ${item.email} ${item.subject}`.toLowerCase())}"><td><strong>${dateTimeFormat.format(new Date(item.start))}</strong><small>${item.classType}</small></td><td><strong>${escapeHtml(item.name)}</strong><small>${escapeHtml(item.email)}</small></td><td><strong>${escapeHtml(item.subject)}</strong><small>${escapeHtml(item.course)}</small></td><td>${escapeHtml(item.modality)}</td><td><strong>${currency.format(item.price)}</strong></td><td><div class="payment-controls"><button class="payment-button pay-yes ${item.paid ? "active" : ""}" data-payment-id="${item.id}" data-paid-value="true" title="Transferencia recibida"><svg viewBox="0 0 24 24"><path d="m5 12.5 4 4 10-10"/></svg></button><button class="payment-button pay-no ${!item.paid ? "active" : ""}" data-payment-id="${item.id}" data-paid-value="false" title="Transferencia pendiente"><svg viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18"/></svg></button></div></td><td>${item.eventUrl ? `<a class="event-link" href="${item.eventUrl}" target="_blank">Abrir ↗</a>` : ""}</td></tr>`).join("")}</tbody></table>`;
 }
 
 function renderClients(clients) {
@@ -122,6 +132,20 @@ $("#loginForm").addEventListener("submit", event => {
   loadReport();
 });
 $("#refreshButton").addEventListener("click", loadReport);
+$("#reminderButton").addEventListener("click", async () => {
+  const button = $("#reminderButton");
+  button.disabled = true;
+  $("#reminderLabel").textContent = "Activando...";
+  try {
+    await api({ action: "setupPaymentReminders" });
+    toast("Recordatorio diario activado");
+    await loadReport();
+  } catch (error) {
+    toast(error.message);
+    button.disabled = false;
+    $("#reminderLabel").textContent = "Activar recordatorio diario";
+  }
+});
 $("#logoutButton").addEventListener("click", () => {
   sessionStorage.removeItem("claseListaAdminKey");
   location.reload();
@@ -133,7 +157,7 @@ document.addEventListener("click", async event => {
   if (payment) {
     payment.disabled = true;
     try {
-      await api({ action: "updatePayment", eventId: payment.dataset.paymentId, paid: payment.dataset.paid !== "true" });
+      await api({ action: "updatePayment", eventId: payment.dataset.paymentId, paid: payment.dataset.paidValue === "true" });
       toast("Estado de pago actualizado");
       await loadReport();
     } catch (error) {
