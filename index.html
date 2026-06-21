@@ -1,0 +1,302 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="description" content="Reserva una clase particular según tu carrera, ramo y disponibilidad." />
+    <title>ClaseLista · Agenda tu clase</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@600;700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <header class="site-header">
+      <a class="brand" href="#" aria-label="ClaseLista">
+        <span class="brand-mark">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6.5 12 3l8 3.5-8 3.5-8-3.5Z"/><path d="M7 9v5.5c2.8 2.2 7.2 2.2 10 0V9M20 7v6"/></svg>
+        </span>
+        <span>Clase<span>Lista</span></span>
+      </a>
+      <div class="header-help">
+        <span class="status-dot"></span>
+        Agenda disponible de 07:00 a 22:00
+      </div>
+    </header>
+
+    <main>
+      <section class="hero">
+        <div class="hero-copy">
+          <span class="pill">Clases particulares a tu medida</span>
+          <h1>Reserva la clase que necesitas, <em>cuando la necesitas.</em></h1>
+          <p>Elige tu ramo, modalidad y horario. Verás únicamente los bloques realmente disponibles.</p>
+          <div class="trust-row">
+            <span><svg viewBox="0 0 24 24"><path d="m5 12.5 4 4 10-10"/></svg> Confirmación inmediata</span>
+            <span><svg viewBox="0 0 24 24"><path d="M5 5h14v14H5z"/><path d="M8 3v4M16 3v4M5 9h14"/></svg> Invitación a tu correo</span>
+            <span><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M12 8v4l3 2"/></svg> Horarios actualizados</span>
+          </div>
+        </div>
+      </section>
+
+      <section class="booking-shell">
+        <aside class="steps-panel">
+          <div class="steps-intro">
+            <span>Tu reserva</span>
+            <strong>Solo tomará unos minutos</strong>
+          </div>
+          <ol class="steps" id="steps">
+            <li class="active" data-step-indicator="1"><i>1</i><div><strong>Tus datos</strong><span>Nombre y correo</span></div></li>
+            <li data-step-indicator="2"><i>2</i><div><strong>Tu clase</strong><span>Nivel, carrera y ramo</span></div></li>
+            <li data-step-indicator="3"><i>3</i><div><strong>Modalidad</strong><span>Cómo y cuánto tiempo</span></div></li>
+            <li data-step-indicator="4"><i>4</i><div><strong>Fecha y hora</strong><span>Elige un bloque disponible</span></div></li>
+            <li data-step-indicator="5"><i>5</i><div><strong>Confirmar</strong><span>Revisa tu reserva</span></div></li>
+          </ol>
+          <div class="secure-note">
+            <svg viewBox="0 0 24 24"><rect x="5" y="10" width="14" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>
+            <div><strong>Reserva segura</strong><span>Tus datos solo se usan para coordinar la clase.</span></div>
+          </div>
+        </aside>
+
+        <div class="booking-card">
+          <div class="mobile-progress">
+            <div><span id="mobileStepLabel">Paso 1 de 5</span><strong id="mobileStepName">Tus datos</strong></div>
+            <span id="progressPercent">20%</span>
+            <div class="progress-track"><i id="progressBar"></i></div>
+          </div>
+
+          <form id="bookingForm" novalidate>
+            <section class="form-step active" data-step="1">
+              <div class="step-heading">
+                <span class="step-kicker">Comencemos</span>
+                <h2>¿Quién tomará la clase?</h2>
+                <p>Usaremos estos datos para enviarte la confirmación y la invitación.</p>
+              </div>
+              <div class="field-grid">
+                <label class="field full">
+                  <span>Nombre completo</span>
+                  <div class="input-wrap">
+                    <svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M5 20a7 7 0 0 1 14 0"/></svg>
+                    <input name="name" autocomplete="name" required placeholder="Ej. Sofía Martínez" />
+                  </div>
+                  <small class="field-error"></small>
+                </label>
+                <label class="field full">
+                  <span>Correo electrónico</span>
+                  <div class="input-wrap">
+                    <svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m4 7 8 6 8-6"/></svg>
+                    <input name="email" type="email" autocomplete="email" required placeholder="nombre@gmail.com" />
+                  </div>
+                  <small class="field-error"></small>
+                </label>
+                <label class="field full">
+                  <span>Teléfono <b>opcional</b></span>
+                  <div class="input-wrap">
+                    <svg viewBox="0 0 24 24"><path d="M7 3h3l1.5 5-2 1.5a15 15 0 0 0 5 5l1.5-2L21 14v3c0 2-2 4-4 4A14 14 0 0 1 3 7c0-2 2-4 4-4Z"/></svg>
+                    <input name="phone" type="tel" autocomplete="tel" placeholder="+56 9 1234 5678" />
+                  </div>
+                </label>
+              </div>
+            </section>
+
+            <section class="form-step" data-step="2">
+              <div class="step-heading">
+                <span class="step-kicker">Cuéntame qué necesitas</span>
+                <h2>Elige tu nivel y ramo</h2>
+                <p>Las opciones se adaptarán según estudies en colegio o universidad.</p>
+              </div>
+              <fieldset class="choice-group">
+                <legend>¿Dónde estudias?</legend>
+                <div class="choice-grid two">
+                  <label class="choice-card">
+                    <input type="radio" name="level" value="Colegio" required />
+                    <span class="choice-icon coral"><svg viewBox="0 0 24 24"><path d="M4 10 12 5l8 5-8 5-8-5Z"/><path d="M7 13v4c3 2 7 2 10 0v-4"/></svg></span>
+                    <span><strong>Colegio</strong><small>Enseñanza básica o media</small></span>
+                    <i class="check"></i>
+                  </label>
+                  <label class="choice-card">
+                    <input type="radio" name="level" value="Universidad" required />
+                    <span class="choice-icon purple"><svg viewBox="0 0 24 24"><path d="M3 10h18M5 10v8M9 10v8M15 10v8M19 10v8M3 19h18M12 4l9 4H3l9-4Z"/></svg></span>
+                    <span><strong>Universidad</strong><small>Carrera técnica o profesional</small></span>
+                    <i class="check"></i>
+                  </label>
+                </div>
+                <small class="group-error"></small>
+              </fieldset>
+
+              <div id="schoolFields" class="conditional-fields" hidden>
+                <label class="field">
+                  <span>Curso</span>
+                  <select name="schoolGrade">
+                    <option value="">Selecciona tu curso</option>
+                    <optgroup label="Enseñanza básica">
+                      <option>5° básico</option><option>6° básico</option><option>7° básico</option><option>8° básico</option>
+                    </optgroup>
+                    <optgroup label="Enseñanza media">
+                      <option>1° medio</option><option>2° medio</option><option>3° medio</option><option>4° medio</option>
+                    </optgroup>
+                  </select>
+                  <small class="field-error"></small>
+                </label>
+                <label class="field">
+                  <span>Asignatura</span>
+                  <select name="schoolSubject">
+                    <option value="">Selecciona una asignatura</option>
+                    <option>Matemática</option><option>Física</option><option>Química</option><option>Biología</option>
+                    <option>Lenguaje</option><option>Inglés</option><option>Historia</option>
+                  </select>
+                  <small class="field-error"></small>
+                </label>
+              </div>
+
+              <div id="universityFields" class="conditional-fields" hidden>
+                <label class="field">
+                  <span>Carrera</span>
+                  <select name="career" id="careerSelect">
+                    <option value="">Selecciona tu carrera</option>
+                  </select>
+                  <small class="field-error"></small>
+                </label>
+                <label class="field">
+                  <span>Ramo</span>
+                  <select name="subject" id="subjectSelect" disabled>
+                    <option value="">Primero selecciona una carrera</option>
+                  </select>
+                  <small class="field-error"></small>
+                </label>
+              </div>
+              <label class="field topic-field">
+                <span>¿Qué contenido necesitas revisar? <b>opcional</b></span>
+                <textarea name="topic" rows="3" placeholder="Ej. Derivadas parciales, preparación para una prueba..."></textarea>
+              </label>
+            </section>
+
+            <section class="form-step" data-step="3">
+              <div class="step-heading">
+                <span class="step-kicker">Personaliza tu clase</span>
+                <h2>¿Cómo prefieres estudiar?</h2>
+                <p>Elige una modalidad y la duración que más te acomode.</p>
+              </div>
+              <fieldset class="choice-group">
+                <legend>Modalidad</legend>
+                <div class="choice-grid three">
+                  <label class="choice-card vertical">
+                    <input type="radio" name="modality" value="Online" required />
+                    <span class="choice-icon blue"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="13" rx="2"/><path d="M8 21h8M12 18v3"/></svg></span>
+                    <span><strong>Online</strong><small>Google Meet</small></span><i class="check"></i>
+                  </label>
+                  <label class="choice-card vertical">
+                    <input type="radio" name="modality" value="Universidad" required />
+                    <span class="choice-icon purple"><svg viewBox="0 0 24 24"><path d="M4 20h16M6 20V9l6-4 6 4v11M9 12h6M9 16h6"/></svg></span>
+                    <span><strong>Universidad</strong><small>Punto acordado</small></span><i class="check"></i>
+                  </label>
+                  <label class="choice-card vertical">
+                    <input type="radio" name="modality" value="A domicilio" required />
+                    <span class="choice-icon green"><svg viewBox="0 0 24 24"><path d="m3 11 9-7 9 7M5 10v10h14V10M9 20v-6h6v6"/></svg></span>
+                    <span><strong>A domicilio</strong><small>Voy a tu dirección</small></span><i class="check"></i>
+                  </label>
+                </div>
+                <small class="group-error"></small>
+              </fieldset>
+
+              <label class="field location-field" id="locationField" hidden>
+                <span id="locationLabel">Lugar de la clase</span>
+                <div class="input-wrap">
+                  <svg viewBox="0 0 24 24"><path d="M20 10c0 5-8 11-8 11S4 15 4 10a8 8 0 1 1 16 0Z"/><circle cx="12" cy="10" r="2.5"/></svg>
+                  <input name="location" placeholder="Escribe la dirección o lugar" />
+                </div>
+                <small class="field-error"></small>
+              </label>
+
+              <fieldset class="choice-group duration-group">
+                <legend>Duración</legend>
+                <div class="duration-grid" id="durationGrid">
+                  <label><input type="radio" name="duration" value="60" required /><span><strong>1 hora</strong><small data-price="60">$15.000</small></span></label>
+                  <label><input type="radio" name="duration" value="90" required /><span><strong>1,5 horas</strong><small data-price="90">$22.500</small></span></label>
+                  <label><input type="radio" name="duration" value="120" required /><span><strong>2 horas</strong><small data-price="120">$30.000</small></span></label>
+                </div>
+                <p class="price-note">Valor base: <strong>$15.000 por hora</strong>. El total se muestra antes de confirmar.</p>
+                <small class="group-error"></small>
+              </fieldset>
+            </section>
+
+            <section class="form-step schedule-step" data-step="4">
+              <div class="step-heading">
+                <span class="step-kicker">Horarios disponibles</span>
+                <h2>Elige el día y la hora</h2>
+                <p>Solo mostramos bloques compatibles con la duración elegida y la agenda actual.</p>
+              </div>
+              <div class="schedule-layout">
+                <div class="calendar">
+                  <div class="calendar-header">
+                    <button type="button" id="previousMonth" aria-label="Mes anterior"><svg viewBox="0 0 24 24"><path d="m15 5-7 7 7 7"/></svg></button>
+                    <strong id="monthTitle"></strong>
+                    <button type="button" id="nextMonth" aria-label="Mes siguiente"><svg viewBox="0 0 24 24"><path d="m9 5 7 7-7 7"/></svg></button>
+                  </div>
+                  <div class="weekdays"><span>Lun</span><span>Mar</span><span>Mié</span><span>Jue</span><span>Vie</span><span>Sáb</span><span>Dom</span></div>
+                  <div class="calendar-days" id="calendarDays"></div>
+                  <div class="calendar-legend"><i></i> Día con horarios disponibles</div>
+                </div>
+                <div class="time-panel">
+                  <div class="time-heading">
+                    <div><span>Horarios para</span><strong id="selectedDateLabel">Selecciona un día</strong></div>
+                    <button type="button" id="refreshAvailability" title="Actualizar disponibilidad"><svg viewBox="0 0 24 24"><path d="M20 11a8 8 0 1 0-2 5.5M20 5v6h-6"/></svg></button>
+                  </div>
+                  <div class="availability-status" id="availabilityStatus"></div>
+                  <div class="time-slots" id="timeSlots">
+                    <div class="slot-placeholder"><svg viewBox="0 0 24 24"><path d="M5 5h14v14H5zM8 3v4M16 3v4M5 9h14"/></svg><span>Selecciona una fecha para ver las horas.</span></div>
+                  </div>
+                </div>
+              </div>
+              <small class="schedule-error" id="scheduleError"></small>
+            </section>
+
+            <section class="form-step" data-step="5">
+              <div class="step-heading">
+                <span class="step-kicker">Ya casi está</span>
+                <h2>Revisa y confirma tu clase</h2>
+                <p>Al confirmar recibirás una invitación de Google Calendar en tu correo.</p>
+              </div>
+              <div class="summary-card">
+                <div class="summary-main">
+                  <span class="summary-date"><strong id="summaryDay"></strong><small id="summaryMonth"></small></span>
+                  <div><span id="summarySubject"></span><h3 id="summaryTitle"></h3><p id="summaryDateTime"></p></div>
+                </div>
+                <div class="summary-grid">
+                  <div><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M12 8v4l3 2"/></svg><span>Duración<strong id="summaryDuration"></strong></span></div>
+                  <div><svg viewBox="0 0 24 24"><path d="M20 10c0 5-8 11-8 11S4 15 4 10a8 8 0 1 1 16 0Z"/><circle cx="12" cy="10" r="2.5"/></svg><span>Modalidad<strong id="summaryModality"></strong></span></div>
+                  <div><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M5 20a7 7 0 0 1 14 0"/></svg><span>Estudiante<strong id="summaryStudent"></strong></span></div>
+                  <div><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m4 7 8 6 8-6"/></svg><span>Invitación a<strong id="summaryEmail"></strong></span></div>
+                </div>
+                <div class="summary-total"><span>Total de la clase<small>Valor calculado según duración</small></span><strong id="summaryPrice"></strong></div>
+              </div>
+              <label class="terms"><input type="checkbox" name="terms" required /><i></i><span>Confirmo que los datos son correctos y acepto que me contacten para coordinar esta clase.</span></label>
+              <small class="terms-error"></small>
+              <div class="calendar-notice"><svg viewBox="0 0 24 24"><path d="M5 5h14v14H5zM8 3v4M16 3v4M5 9h14"/><path d="m9 14 2 2 4-4"/></svg><span>La reserva se agregará automáticamente al calendario y recibirás la invitación en <strong id="noticeEmail"></strong>.</span></div>
+            </section>
+
+            <div class="form-alert" id="formAlert" role="alert"></div>
+            <div class="form-actions">
+              <button class="button back" id="backButton" type="button" hidden><svg viewBox="0 0 24 24"><path d="m15 5-7 7 7 7"/></svg> Atrás</button>
+              <span></span>
+              <button class="button primary" id="nextButton" type="button">Continuar <svg viewBox="0 0 24 24"><path d="m9 5 7 7-7 7"/></svg></button>
+              <button class="button primary confirm" id="submitButton" type="submit" hidden>Confirmar reserva <svg viewBox="0 0 24 24"><path d="m5 12.5 4 4 10-10"/></svg></button>
+            </div>
+          </form>
+        </div>
+      </section>
+    </main>
+
+    <dialog id="successDialog" class="success-dialog">
+      <div class="success-icon"><svg viewBox="0 0 24 24"><path d="m5 12.5 4 4 10-10"/></svg></div>
+      <span class="step-kicker">Reserva confirmada</span>
+      <h2>¡Tu clase quedó agendada!</h2>
+      <p id="successMessage"></p>
+      <div class="success-details" id="successDetails"></div>
+      <a class="button calendar-link" id="calendarLink" target="_blank" rel="noopener" hidden>Ver evento en Google Calendar</a>
+      <button class="button primary" id="newBookingButton" type="button">Agendar otra clase</button>
+    </dialog>
+
+    <div class="toast" id="toast" role="status"></div>
+    <script src="app.js"></script>
+  </body>
+</html>

@@ -1,0 +1,403 @@
+const CONFIG = {
+  // Pega aquí la URL /exec de tu despliegue de Google Apps Script.
+  calendarApiUrl: "https://script.google.com/macros/s/AKfycbx15WaCNvIYEGHdEWDXMcMTU43iSBpXWJGLaun25BM-6zo5dukO3tU0P_AISENQBxpg/exec",
+  timezone: "America/Santiago",
+  pricePerHour: 15000,
+  firstStartHour: 7,
+  lastStartHour: 22,
+  slotIntervalMinutes: 30,
+  bookingWindowDays: 60,
+};
+
+const CAREERS = {
+  "Ingeniería Civil": ["Cálculo I", "Cálculo II", "Álgebra", "Álgebra lineal", "Física I", "Física II", "Ecuaciones diferenciales", "Estática"],
+  "Ingeniería Comercial": [
+    "Matemáticas Avanzadas I",
+    "Matemáticas Avanzadas II",
+    "Estadística y Data Science",
+    "Introducción al Cálculo",
+    "Introducción al Álgebra",
+  ],
+};
+
+const state = {
+  step: 1,
+  month: new Date(new Date().getFullYear(), new Date().getMonth(), 1),
+  selectedDate: "",
+  selectedTime: "",
+  busySlots: [],
+  availabilitySource: "local",
+};
+
+const $ = (selector, root = document) => root.querySelector(selector);
+const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
+const form = $("#bookingForm");
+const money = new Intl.NumberFormat("es-CL", { style: "currency", currency: "CLP", maximumFractionDigits: 0 });
+
+function dateKey(date) {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
+function parseDate(value) {
+  const [y, m, d] = value.split("-").map(Number);
+  return new Date(y, m - 1, d);
+}
+
+function addDays(date, days) {
+  const result = new Date(date);
+  result.setDate(result.getDate() + days);
+  return result;
+}
+
+function minutes(time) {
+  const [h, m] = time.split(":").map(Number);
+  return h * 60 + m;
+}
+
+function timeFromMinutes(value) {
+  return `${String(Math.floor(value / 60)).padStart(2, "0")}:${String(value % 60).padStart(2, "0")}`;
+}
+
+function formData() {
+  return Object.fromEntries(new FormData(form).entries());
+}
+
+function selectedSubject(data = formData()) {
+  return data.level === "Universidad" ? data.subject : data.schoolSubject;
+}
+
+function selectedCourse(data = formData()) {
+  return data.level === "Universidad" ? data.career : data.schoolGrade;
+}
+
+function initializeCareers() {
+  $("#careerSelect").insertAdjacentHTML("beforeend", Object.keys(CAREERS).map(career => `<option>${career}</option>`).join(""));
+}
+
+function updateSubjects() {
+  const career = $("#careerSelect").value;
+  const select = $("#subjectSelect");
+  select.disabled = !career;
+  select.innerHTML = career
+    ? `<option value="">Selecciona un ramo</option>${CAREERS[career].map(subject => `<option>${subject}</option>`).join("")}`
+    : `<option value="">Primero selecciona una carrera</option>`;
+}
+
+function updateLevelFields() {
+  const level = formData().level;
+  $("#schoolFields").hidden = level !== "Colegio";
+  $("#universityFields").hidden = level !== "Universidad";
+  form.schoolGrade.required = level === "Colegio";
+  form.schoolSubject.required = level === "Colegio";
+  form.career.required = level === "Universidad";
+  form.subject.required = level === "Universidad";
+}
+
+function updateModality() {
+  const modality = formData().modality;
+  const needsLocation = modality === "Universidad" || modality === "A domicilio";
+  $("#locationField").hidden = !needsLocation;
+  form.location.required = needsLocation;
+  $("#locationLabel").textContent = modality === "A domicilio" ? "Dirección de la clase" : "Lugar dentro de la universidad";
+  form.location.placeholder = modality === "A domicilio" ? "Calle, número y comuna" : "Campus, biblioteca o sala";
+}
+
+function setStep(next) {
+  state.step = Math.max(1, Math.min(5, next));
+  $$(".form-step").forEach(section => section.classList.toggle("active", Number(section.dataset.step) === state.step));
+  $$("[data-step-indicator]").forEach(item => {
+    const number = Number(item.dataset.stepIndicator);
+    item.classList.toggle("active", number === state.step);
+    item.classList.toggle("complete", number < state.step);
+  });
+  const names = ["Tus datos", "Tu clase", "Modalidad", "Fecha y hora", "Confirmar"];
+  $("#mobileStepLabel").textContent = `Paso ${state.step} de 5`;
+  $("#mobileStepName").textContent = names[state.step - 1];
+  $("#progressPercent").textContent = `${state.step * 20}%`;
+  $("#progressBar").style.width = `${state.step * 20}%`;
+  $("#backButton").hidden = state.step === 1;
+  $("#nextButton").hidden = state.step === 5;
+  $("#submitButton").hidden = state.step !== 5;
+  $("#formAlert").textContent = "";
+  if (state.step === 4) {
+    renderCalendar();
+    if (state.selectedDate) loadAvailability(state.selectedDate);
+  }
+  if (state.step === 5) renderSummary();
+  window.scrollTo({ top: Math.max(0, $(".booking-shell").offsetTop - 15), behavior: "smooth" });
+}
+
+function clearErrors(section) {
+  $$(".invalid", section).forEach(field => field.classList.remove("invalid"));
+  $$(".field-error, .group-error, .schedule-error, .terms-error", section).forEach(error => error.textContent = "");
+}
+
+function markFieldError(input, message) {
+  const field = input.closest(".field");
+  if (field) {
+    field.classList.add("invalid");
+    $(".field-error", field).textContent = message;
+  }
+}
+
+function validateStep(step) {
+  const section = $(`[data-step="${step}"]`);
+  clearErrors(section);
+  let valid = true;
+  const visibleRequired = $$("[required]", section).filter(input => !input.closest("[hidden]"));
+  visibleRequired.forEach(input => {
+    if (input.type === "radio" || input.type === "checkbox") return;
+    if (!input.checkValidity()) {
+      markFieldError(input, input.type === "email" ? "Ingresa un correo válido." : "Este campo es obligatorio.");
+      valid = false;
+    }
+  });
+
+  const radioNames = [...new Set(visibleRequired.filter(input => input.type === "radio").map(input => input.name))];
+  radioNames.forEach(name => {
+    if (!form.querySelector(`[name="${name}"]:checked`)) {
+      const group = form.querySelector(`[name="${name}"]`).closest(".choice-group");
+      $(".group-error", group).textContent = "Selecciona una opción.";
+      valid = false;
+    }
+  });
+
+  if (step === 4 && (!state.selectedDate || !state.selectedTime)) {
+    $("#scheduleError").textContent = "Selecciona una fecha y un horario disponible.";
+    valid = false;
+  }
+  if (step === 5 && !form.terms.checked) {
+    $(".terms-error").textContent = "Debes confirmar los datos para reservar.";
+    valid = false;
+  }
+  return valid;
+}
+
+function renderCalendar() {
+  const title = new Intl.DateTimeFormat("es-CL", { month: "long", year: "numeric" }).format(state.month);
+  $("#monthTitle").textContent = title;
+  const first = new Date(state.month.getFullYear(), state.month.getMonth(), 1);
+  const offset = (first.getDay() + 6) % 7;
+  const gridStart = addDays(first, -offset);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const lastBookable = addDays(today, CONFIG.bookingWindowDays);
+  let html = "";
+
+  for (let index = 0; index < 42; index += 1) {
+    const day = addDays(gridStart, index);
+    const key = dateKey(day);
+    const isPast = day < today;
+    const tooLate = day > lastBookable;
+    const otherMonth = day.getMonth() !== state.month.getMonth();
+    const available = !isPast && !tooLate;
+    html += `<button type="button" class="calendar-day ${otherMonth ? "other-month" : ""} ${available ? "available" : ""} ${dateKey(today) === key ? "today" : ""} ${state.selectedDate === key ? "selected" : ""}" data-date="${key}" ${available ? "" : "disabled"}>${day.getDate()}</button>`;
+  }
+  $("#calendarDays").innerHTML = html;
+}
+
+async function loadAvailability(date) {
+  state.selectedDate = date;
+  state.selectedTime = "";
+  renderCalendar();
+  const panel = $("#timeSlots");
+  panel.innerHTML = `<div class="slot-loading">Consultando agenda...</div>`;
+  $("#selectedDateLabel").textContent = new Intl.DateTimeFormat("es-CL", { weekday: "long", day: "numeric", month: "long" }).format(parseDate(date));
+  $("#scheduleError").textContent = "";
+
+  state.busySlots = [];
+  state.availabilitySource = "local";
+  if (CONFIG.calendarApiUrl) {
+    try {
+      const response = await fetch(`${CONFIG.calendarApiUrl}?action=availability&date=${date}&timezone=${encodeURIComponent(CONFIG.timezone)}`);
+      if (!response.ok) throw new Error("No fue posible consultar Calendar");
+      const result = await response.json();
+      state.busySlots = result.busy || [];
+      state.availabilitySource = "calendar";
+    } catch (error) {
+      console.error(error);
+      showToast("No se pudo consultar Google Calendar. Revisa la configuración.");
+    }
+  }
+  renderTimeSlots();
+}
+
+function renderTimeSlots() {
+  const duration = Number(formData().duration || 60);
+  const now = new Date();
+  const selected = parseDate(state.selectedDate);
+  const slots = [];
+  for (let start = CONFIG.firstStartHour * 60; start <= CONFIG.lastStartHour * 60; start += CONFIG.slotIntervalMinutes) {
+    const end = start + duration;
+    const startTime = timeFromMinutes(start);
+    const endTime = timeFromMinutes(end);
+    const isTooSoon = dateKey(now) === state.selectedDate && start <= now.getHours() * 60 + now.getMinutes() + 60;
+    const blocked = state.busySlots.some(busy => minutes(busy.start) < end && minutes(busy.end) > start);
+    if (!isTooSoon && !blocked) slots.push({ start: startTime, end: endTime });
+  }
+  $("#availabilityStatus").className = `availability-status ${state.availabilitySource === "calendar" ? "live" : ""}`;
+  $("#availabilityStatus").textContent = state.availabilitySource === "calendar"
+    ? "● Disponibilidad sincronizada con Google Calendar"
+    : CONFIG.calendarApiUrl ? "Disponibilidad local de respaldo" : "Vista previa · conecta Google Calendar para bloquear horas ocupadas";
+
+  $("#timeSlots").innerHTML = slots.length
+    ? slots.map(slot => `<button class="time-slot" type="button" data-time="${slot.start}" data-end="${slot.end}">${slot.start}</button>`).join("")
+    : `<div class="no-slots"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M12 8v4l3 2"/></svg><span>No quedan horas disponibles este día.<br>Prueba con otra fecha.</span></div>`;
+}
+
+function renderSummary() {
+  const data = formData();
+  const date = parseDate(state.selectedDate);
+  const duration = Number(data.duration);
+  const end = timeFromMinutes(minutes(state.selectedTime) + duration);
+  $("#summaryDay").textContent = date.getDate();
+  $("#summaryMonth").textContent = new Intl.DateTimeFormat("es-CL", { month: "short" }).format(date).replace(".", "");
+  $("#summarySubject").textContent = `${data.level} · ${selectedCourse(data)}`;
+  $("#summaryTitle").textContent = selectedSubject(data);
+  $("#summaryDateTime").textContent = `${new Intl.DateTimeFormat("es-CL", { weekday: "long", day: "numeric", month: "long" }).format(date)} · ${state.selectedTime} a ${end}`;
+  $("#summaryDuration").textContent = duration === 60 ? "1 hora" : duration === 90 ? "1 hora 30 min" : "2 horas";
+  $("#summaryModality").textContent = data.modality === "Online" ? "Online · Google Meet" : `${data.modality} · ${data.location}`;
+  $("#summaryStudent").textContent = data.name;
+  $("#summaryEmail").textContent = data.email;
+  $("#noticeEmail").textContent = data.email;
+  $("#summaryPrice").textContent = money.format(CONFIG.pricePerHour * duration / 60);
+}
+
+function buildPayload() {
+  const data = formData();
+  const duration = Number(data.duration);
+  return {
+    name: data.name,
+    email: data.email,
+    phone: data.phone || "",
+    level: data.level,
+    course: selectedCourse(data),
+    subject: selectedSubject(data),
+    topic: data.topic || "",
+    modality: data.modality,
+    location: data.modality === "Online" ? "Google Meet" : data.location,
+    date: state.selectedDate,
+    start: state.selectedTime,
+    end: timeFromMinutes(minutes(state.selectedTime) + duration),
+    duration,
+    price: CONFIG.pricePerHour * duration / 60,
+    timezone: CONFIG.timezone,
+    createMeet: data.modality === "Online",
+  };
+}
+
+async function submitBooking() {
+  if (!validateStep(5)) return;
+  const payload = buildPayload();
+  const button = $("#submitButton");
+  button.disabled = true;
+  button.textContent = "Confirmando...";
+  $("#formAlert").textContent = "";
+
+  try {
+    let result = { success: true, demo: true };
+    if (CONFIG.calendarApiUrl) {
+      const response = await fetch(CONFIG.calendarApiUrl, {
+        method: "POST",
+        headers: { "Content-Type": "text/plain;charset=utf-8" },
+        body: JSON.stringify({ action: "book", ...payload }),
+      });
+      result = await response.json();
+      if (!response.ok || !result.success) throw new Error(result.error || "No fue posible crear la reserva.");
+    } else {
+      await new Promise(resolve => setTimeout(resolve, 650));
+    }
+    showSuccess(payload, result);
+  } catch (error) {
+    $("#formAlert").textContent = `${error.message} Actualiza la disponibilidad e intenta nuevamente.`;
+  } finally {
+    button.disabled = false;
+    button.innerHTML = `Confirmar reserva <svg viewBox="0 0 24 24"><path d="m5 12.5 4 4 10-10"/></svg>`;
+  }
+}
+
+function showSuccess(payload, result) {
+  $("#successMessage").textContent = result.demo
+    ? "La interfaz funciona correctamente. Conecta Google Calendar para que la reserva se cree y envíe de forma real."
+    : `Enviamos la invitación a ${payload.email}. Revisa también la carpeta de spam.`;
+  $("#successDetails").innerHTML = `<strong>${payload.subject}</strong><br>${new Intl.DateTimeFormat("es-CL", { dateStyle: "full" }).format(parseDate(payload.date))}<br>${payload.start} · ${payload.modality}`;
+  const link = $("#calendarLink");
+  link.hidden = !result.eventUrl;
+  if (result.eventUrl) link.href = result.eventUrl;
+  $("#successDialog").showModal();
+}
+
+function resetBooking() {
+  form.reset();
+  state.selectedDate = "";
+  state.selectedTime = "";
+  state.month = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+  updateLevelFields();
+  updateModality();
+  $("#successDialog").close();
+  setStep(1);
+}
+
+let toastTimer;
+function showToast(message) {
+  $("#toast").textContent = message;
+  $("#toast").classList.add("visible");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => $("#toast").classList.remove("visible"), 3200);
+}
+
+$("#nextButton").addEventListener("click", () => {
+  if (validateStep(state.step)) setStep(state.step + 1);
+});
+$("#backButton").addEventListener("click", () => setStep(state.step - 1));
+form.addEventListener("submit", event => {
+  event.preventDefault();
+  submitBooking();
+});
+form.addEventListener("change", event => {
+  if (event.target.name === "level") updateLevelFields();
+  if (event.target.name === "career") updateSubjects();
+  if (event.target.name === "modality") updateModality();
+  if (event.target.name === "duration" && state.selectedDate) loadAvailability(state.selectedDate);
+  const field = event.target.closest(".field");
+  if (field) {
+    field.classList.remove("invalid");
+    const error = $(".field-error", field);
+    if (error) error.textContent = "";
+  }
+});
+$("#calendarDays").addEventListener("click", event => {
+  const day = event.target.closest("[data-date]");
+  if (day && !day.disabled) loadAvailability(day.dataset.date);
+});
+$("#timeSlots").addEventListener("click", event => {
+  const slot = event.target.closest("[data-time]");
+  if (!slot) return;
+  $$(".time-slot").forEach(item => item.classList.remove("selected"));
+  slot.classList.add("selected");
+  state.selectedTime = slot.dataset.time;
+  $("#scheduleError").textContent = "";
+});
+$("#previousMonth").addEventListener("click", () => {
+  const currentMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+  const previous = new Date(state.month.getFullYear(), state.month.getMonth() - 1, 1);
+  if (previous >= currentMonth) state.month = previous;
+  renderCalendar();
+});
+$("#nextMonth").addEventListener("click", () => {
+  state.month = new Date(state.month.getFullYear(), state.month.getMonth() + 1, 1);
+  renderCalendar();
+});
+$("#refreshAvailability").addEventListener("click", () => {
+  if (state.selectedDate) loadAvailability(state.selectedDate);
+  else showToast("Primero selecciona una fecha.");
+});
+$("#newBookingButton").addEventListener("click", resetBooking);
+
+initializeCareers();
+updateLevelFields();
+updateModality();
+renderCalendar();
