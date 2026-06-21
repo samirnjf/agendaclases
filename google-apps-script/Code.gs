@@ -12,6 +12,8 @@ const CALENDAR_ID = "primary";
 const TIMEZONE = "America/Santiago";
 const FIRST_START_HOUR = 7;
 const LAST_START_HOUR = 22;
+const EVALUATION_BUFFER_MINUTES = 60;
+const EVALUATION_KEYWORDS = ["prueba", "evaluación", "evaluacion", "examen", "control", "certamen"];
 // Cambia esta clave antes de desplegar. Se usará para entrar al panel privado.
 const ADMIN_KEY = "CAMBIA-ESTA-CLAVE-PRIVADA";
 
@@ -22,12 +24,10 @@ function doGet(e) {
     }
     const date = requireDate(e.parameter.date);
     const start = new Date(`${date}T00:00:00`);
+    const searchStart = new Date(start.getTime() - 24 * 60 * 60 * 1000);
     const end = new Date(`${date}T23:59:59`);
-    const events = CalendarApp.getCalendarById(CALENDAR_ID).getEvents(start, end);
-    const busy = events.map(event => ({
-      start: Utilities.formatDate(event.getStartTime(), TIMEZONE, "HH:mm"),
-      end: Utilities.formatDate(event.getEndTime(), TIMEZONE, "HH:mm"),
-    }));
+    const events = CalendarApp.getCalendarById(CALENDAR_ID).getEvents(searchStart, end);
+    const busy = buildBusySlots(events, date);
     return jsonResponse({ success: true, date, busy });
   } catch (error) {
     return jsonResponse({ success: false, error: error.message });
@@ -58,8 +58,17 @@ function doPost(e) {
     const start = new Date(`${data.date}T${data.start}:00`);
     const end = new Date(`${data.date}T${data.end}:00`);
     const calendar = CalendarApp.getCalendarById(CALENDAR_ID);
-    const conflicts = calendar.getEvents(start, end);
-    if (conflicts.length) throw new Error("Ese horario acaba de ser reservado. Elige otro bloque.");
+    const dayStart = new Date(`${data.date}T00:00:00`);
+    const searchStart = new Date(dayStart.getTime() - 24 * 60 * 60 * 1000);
+    const dayEnd = new Date(`${data.date}T23:59:59`);
+    const busySlots = buildBusySlots(calendar.getEvents(searchStart, dayEnd), data.date);
+    const requestedStart = timeToMinutes(data.start);
+    const requestedEnd = timeToMinutes(data.end);
+    const hasConflict = busySlots.some(slot =>
+      timeToMinutes(slot.start) < requestedEnd &&
+      timeToMinutes(slot.end) > requestedStart
+    );
+    if (hasConflict) throw new Error("Ese horario no está disponible o está restringido por una evaluación.");
 
     const title = `Clase de ${data.subject} · ${data.name}`;
     const description = [
@@ -114,6 +123,72 @@ function doPost(e) {
   } finally {
     lock.releaseLock();
   }
+}
+
+/**
+ * Las pruebas y evaluaciones bloquean desde las 07:00 hasta una hora después
+ * de terminar. Los demás eventos bloquean únicamente su duración real.
+ */
+function buildBusySlots(events, date) {
+  const slots = [];
+  events.forEach(event => {
+    const isEvaluation = isEvaluationEvent(event.getTitle());
+    const eventStart = event.getStartTime();
+    const eventEnd = event.getEndTime();
+    const eventStartDate = Utilities.formatDate(eventStart, TIMEZONE, "yyyy-MM-dd");
+    const eventEndDate = Utilities.formatDate(eventEnd, TIMEZONE, "yyyy-MM-dd");
+
+    if (event.isAllDayEvent()) {
+      if (eventEndDate <= date) return;
+      slots.push({ start: "00:00", end: "23:59", reason: isEvaluation ? "evaluation" : "event" });
+      return;
+    }
+
+    if (isEvaluation) {
+      const bufferedEnd = new Date(eventEnd.getTime() + EVALUATION_BUFFER_MINUTES * 60 * 1000);
+      const bufferedEndDate = Utilities.formatDate(bufferedEnd, TIMEZONE, "yyyy-MM-dd");
+      if (bufferedEndDate < date) return;
+      slots.push({
+        start: eventStartDate < date ? "00:00" : `${String(FIRST_START_HOUR).padStart(2, "0")}:00`,
+        end: bufferedEndDate > date ? "23:59" : Utilities.formatDate(bufferedEnd, TIMEZONE, "HH:mm"),
+        reason: "evaluation",
+      });
+      return;
+    }
+
+    if (eventEndDate < date) return;
+    slots.push({
+      start: eventStartDate < date ? "00:00" : Utilities.formatDate(eventStart, TIMEZONE, "HH:mm"),
+      end: eventEndDate > date ? "23:59" : Utilities.formatDate(eventEnd, TIMEZONE, "HH:mm"),
+      reason: "event",
+    });
+  });
+  return mergeBusySlots(slots);
+}
+
+function isEvaluationEvent(title) {
+  const normalized = String(title || "").toLowerCase();
+  return EVALUATION_KEYWORDS.some(keyword => normalized.indexOf(keyword) >= 0);
+}
+
+function timeToMinutes(time) {
+  const parts = time.split(":").map(Number);
+  return parts[0] * 60 + parts[1];
+}
+
+function mergeBusySlots(slots) {
+  if (!slots.length) return [];
+  const sorted = slots.slice().sort((a, b) => timeToMinutes(a.start) - timeToMinutes(b.start));
+  return sorted.reduce((merged, slot) => {
+    const previous = merged[merged.length - 1];
+    if (previous && timeToMinutes(slot.start) <= timeToMinutes(previous.end)) {
+      if (timeToMinutes(slot.end) > timeToMinutes(previous.end)) previous.end = slot.end;
+      if (slot.reason === "evaluation") previous.reason = "evaluation";
+    } else {
+      merged.push({ start: slot.start, end: slot.end, reason: slot.reason });
+    }
+    return merged;
+  }, []);
 }
 
 function requireAdmin(key) {
