@@ -71,6 +71,14 @@
         </div>
       </main>
     </div>
+    <dialog class="payment-dialog" id="paymentDialog">
+      <div class="dialog-heading">
+        <div><span class="eyebrow" id="paymentDialogEyebrow">Detalle financiero</span><h2 id="paymentDialogTitle"></h2></div>
+        <button type="button" id="closePaymentDialog" aria-label="Cerrar"><svg viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18"/></svg></button>
+      </div>
+      <div class="dialog-total"><span id="paymentDialogCount"></span><strong id="paymentDialogTotal"></strong></div>
+      <div class="payment-detail-list" id="paymentDetailList"></div>
+    </dialog>
     <div class="toast" id="toast"></div>
     <script src="admin.js"></script>
   </body>

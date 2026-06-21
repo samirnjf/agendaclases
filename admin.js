@@ -61,12 +61,16 @@ function renderReminderStatus() {
 function renderMetrics() {
   const m = report.metrics;
   const items = [
-    ["Clientes actuales", m.activeClients, `${m.totalClients} clientes históricos`, ""],
-    ["Próximas clases", m.upcomingClasses, `${m.completedClasses} clases realizadas`, ""],
-    ["Ingresos esperados", currency.format(m.totalExpected), `${currency.format(m.totalPending)} aún pendientes`, "money"],
-    ["Ingresos pagados", currency.format(m.totalPaid), `${currency.format(m.overdueAmount)} vencidos`, m.overdueAmount ? "warning" : "money"],
+    ["Clientes actuales", m.activeClients, `${m.totalClients} clientes históricos`, "", ""],
+    ["Próximas clases", m.upcomingClasses, `${m.completedClasses} clases realizadas`, "", ""],
+    ["Ingresos esperados", currency.format(m.totalExpected), "Total de todas las reservas", "money", ""],
+    ["Ingresos pagados", currency.format(m.totalPaid), "Ver quiénes pagaron", "money", "paid"],
+    ["Ingresos por cobrar", currency.format(m.totalPending), `${currency.format(m.overdueAmount)} vencidos`, m.totalPending ? "warning" : "money", "pending"],
   ];
-  $("#metrics").innerHTML = items.map(([label, value, note, type]) => `<article class="metric ${type}"><span>${label}</span><strong>${value}</strong><small>${note}</small></article>`).join("");
+  $("#metrics").innerHTML = items.map(([label, value, note, type, detail]) => detail
+    ? `<button class="metric clickable ${type}" type="button" data-payment-detail="${detail}"><span>${label}</span><strong>${value}</strong><small>${note}</small></button>`
+    : `<article class="metric ${type}"><span>${label}</span><strong>${value}</strong><small>${note}</small></article>`
+  ).join("");
 }
 
 function renderOverview() {
@@ -103,6 +107,30 @@ function showSection(section) {
   $$(".page-section").forEach(page => page.classList.toggle("active", page.dataset.page === section));
   $$("[data-section]").forEach(button => button.classList.toggle("active", button.dataset.section === section));
   $("#sectionTitle").textContent = titles[section];
+}
+
+function showPaymentDetail(type) {
+  const allEvents = [...report.upcoming, ...report.history]
+    .filter(item => type === "paid" ? item.paid : !item.paid)
+    .sort((a, b) => new Date(b.start) - new Date(a.start));
+  const isPaid = type === "paid";
+  const total = allEvents.reduce((sum, item) => sum + item.price, 0);
+  $("#paymentDialogEyebrow").textContent = isPaid ? "Transferencias recibidas" : "Cobros pendientes";
+  $("#paymentDialogTitle").textContent = isPaid ? "Quiénes ya pagaron" : "Quiénes faltan por pagar";
+  $("#paymentDialogCount").textContent = `${allEvents.length} ${allEvents.length === 1 ? "clase" : "clases"}`;
+  $("#paymentDialogTotal").textContent = currency.format(total);
+  $("#paymentDetailList").innerHTML = allEvents.length
+    ? allEvents.map(item => {
+        const date = new Date(item.start);
+        return `<div class="payment-detail-row ${isPaid ? "" : "pending"}">
+          <span class="date-block"><strong>${date.getDate()}</strong><span>${new Intl.DateTimeFormat("es-CL",{month:"short"}).format(date)}</span></span>
+          <div class="payment-person"><strong>${escapeHtml(item.name)}</strong><span>${escapeHtml(item.email)}</span></div>
+          <div class="payment-class"><strong>${escapeHtml(item.subject)}</strong>${dateTimeFormat.format(date)}</div>
+          <strong class="payment-amount">${currency.format(item.price)}</strong>
+        </div>`;
+      }).join("")
+    : empty(isPaid ? "Todavía no has registrado transferencias." : "No hay pagos pendientes.");
+  $("#paymentDialog").showModal();
 }
 
 function empty(message) {
@@ -153,6 +181,8 @@ $("#logoutButton").addEventListener("click", () => {
 document.addEventListener("click", async event => {
   const section = event.target.closest("[data-section]")?.dataset.section || event.target.closest("[data-go]")?.dataset.go;
   if (section) showSection(section);
+  const paymentDetail = event.target.closest("[data-payment-detail]")?.dataset.paymentDetail;
+  if (paymentDetail) showPaymentDetail(paymentDetail);
   const payment = event.target.closest("[data-payment-id]");
   if (payment) {
     payment.disabled = true;
@@ -165,6 +195,10 @@ document.addEventListener("click", async event => {
       payment.disabled = false;
     }
   }
+});
+$("#closePaymentDialog").addEventListener("click", () => $("#paymentDialog").close());
+$("#paymentDialog").addEventListener("click", event => {
+  if (event.target === $("#paymentDialog")) $("#paymentDialog").close();
 });
 $$("[data-search]").forEach(input => input.addEventListener("input", event => {
   const query = event.target.value.toLowerCase().trim();
