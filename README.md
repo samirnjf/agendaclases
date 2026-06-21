@@ -47,6 +47,7 @@ Con la integración activa:
 - Se crea el evento en tu calendario.
 - Se invita automáticamente al correo del alumno.
 - Para clases online se crea un enlace de Google Meet.
+- Todas las clases nuevas se crean con color amarillo en Google Calendar.
 - En clases grupales se invita al correo principal y a todos los integrantes.
 - La reserva puede registrar opcionalmente quién recomendó la clase.
 

@@ -14,6 +14,8 @@ const FIRST_START_HOUR = 7;
 const LAST_START_HOUR = 22;
 const EVALUATION_BUFFER_MINUTES = 60;
 const EVALUATION_KEYWORDS = ["prueba", "evaluacion", "examen", "control", "certamen", "presentacion"];
+// Color 5 corresponde a amarillo ("Banana") en Google Calendar.
+const CLASS_EVENT_COLOR_ID = "5";
 // Cambia esta clave antes de desplegar. Se usará para entrar al panel privado.
 const ADMIN_KEY = "CAMBIA-ESTA-CLAVE-PRIVADA";
 
@@ -96,6 +98,7 @@ function doPost(e) {
       attendees: [data.email].concat(data.groupEmails || []).map(email => ({ email })),
       guestsCanModify: false,
       guestsCanInviteOthers: false,
+      colorId: CLASS_EVENT_COLOR_ID,
     };
 
     if (data.createMeet) {
