@@ -35,6 +35,8 @@ const state = {
   selectedTime: "",
   busySlots: [],
   availabilitySource: "local",
+  travelQuote: null,
+  quotedAddress: "",
 };
 
 const $ = (selector, root = document) => root.querySelector(selector);
@@ -111,6 +113,11 @@ function updateModality() {
   form.location.required = needsLocation;
   $("#locationLabel").textContent = modality === "A domicilio" ? "Dirección de la clase" : "Lugar dentro de la universidad";
   form.location.placeholder = modality === "A domicilio" ? "Calle, número y comuna" : "Campus, biblioteca o sala";
+  if (modality !== "A domicilio") {
+    state.travelQuote = null;
+    state.quotedAddress = "";
+    $("#travelQuote").hidden = true;
+  }
 }
 
 function updateClassType() {
@@ -139,6 +146,38 @@ function groupEmails() {
   return [...new Set($$(".member-email", $("#memberEmailList"))
     .map(input => input.value.trim().toLowerCase())
     .filter(email => email && email !== mainEmail))];
+}
+
+async function ensureTravelQuote() {
+  const data = formData();
+  if (data.modality !== "A domicilio") return true;
+  const destination = data.location.trim();
+  if (state.travelQuote && state.quotedAddress === destination) return true;
+  const button = $("#nextButton");
+  $("#formAlert").textContent = "";
+  button.disabled = true;
+  button.textContent = "Calculando traslado...";
+  try {
+    const response = await fetch(CONFIG.calendarApiUrl, {
+      method: "POST",
+      headers: { "Content-Type": "text/plain;charset=utf-8" },
+      body: JSON.stringify({ action: "travelQuote", destination }),
+    });
+    const result = await response.json();
+    if (!result.success) throw new Error(result.error || "No fue posible calcular el traslado.");
+    state.travelQuote = result;
+    state.quotedAddress = destination;
+    $("#travelQuotePrice").textContent = money.format(result.surcharge);
+    $("#travelQuoteDetail").textContent = `Aprox. ${result.roundTripMinutes} min de traslado total`;
+    $("#travelQuote").hidden = false;
+    return true;
+  } catch (error) {
+    $("#formAlert").textContent = error.message;
+    return false;
+  } finally {
+    button.disabled = false;
+    button.innerHTML = `Continuar <svg viewBox="0 0 24 24"><path d="m9 5 7 7-7 7"/></svg>`;
+  }
 }
 
 function setStep(next) {
@@ -316,7 +355,12 @@ function renderSummary() {
     ? `${data.email} y ${groupEmails().length} más`
     : data.email;
   $("#noticeEmail").textContent = data.email;
-  $("#summaryPrice").textContent = money.format(CONFIG.pricePerHour * duration / 60);
+  const basePrice = CONFIG.pricePerHour * duration / 60;
+  const travelSurcharge = data.modality === "A domicilio" ? Number(state.travelQuote?.surcharge || 0) : 0;
+  $("#summaryTravelBreakdown").hidden = !travelSurcharge;
+  $("#summaryBasePrice").textContent = money.format(basePrice);
+  $("#summaryTravelPrice").textContent = money.format(travelSurcharge);
+  $("#summaryPrice").textContent = money.format(basePrice + travelSurcharge);
 }
 
 function buildPayload() {
@@ -339,7 +383,8 @@ function buildPayload() {
     start: state.selectedTime,
     end: timeFromMinutes(minutes(state.selectedTime) + duration),
     duration,
-    price: CONFIG.pricePerHour * duration / 60,
+    price: CONFIG.pricePerHour * duration / 60 + Number(state.travelQuote?.surcharge || 0),
+    travelSurcharge: Number(state.travelQuote?.surcharge || 0),
     timezone: CONFIG.timezone,
     createMeet: data.modality === "Online",
   };
@@ -390,6 +435,8 @@ function resetBooking() {
   form.reset();
   state.selectedDate = "";
   state.selectedTime = "";
+  state.travelQuote = null;
+  state.quotedAddress = "";
   state.month = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
   updateLevelFields();
   updateModality();
@@ -407,8 +454,10 @@ function showToast(message) {
   toastTimer = setTimeout(() => $("#toast").classList.remove("visible"), 3200);
 }
 
-$("#nextButton").addEventListener("click", () => {
-  if (validateStep(state.step)) setStep(state.step + 1);
+$("#nextButton").addEventListener("click", async () => {
+  if (!validateStep(state.step)) return;
+  if (state.step === 3 && !(await ensureTravelQuote())) return;
+  setStep(state.step + 1);
 });
 $("#backButton").addEventListener("click", () => setStep(state.step - 1));
 form.addEventListener("submit", event => {
@@ -427,6 +476,11 @@ form.addEventListener("change", event => {
     const error = $(".field-error", field);
     if (error) error.textContent = "";
   }
+});
+form.location.addEventListener("input", () => {
+  state.travelQuote = null;
+  state.quotedAddress = "";
+  $("#travelQuote").hidden = true;
 });
 $("#addMemberButton").addEventListener("click", () => addMemberEmail());
 $("#memberEmailList").addEventListener("click", event => {

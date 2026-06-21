@@ -37,6 +37,15 @@ Antes de utilizarlo:
 5. Pulsa **Activar recordatorio diario** una sola vez. Apps Script pedirá los permisos
    necesarios y enviará cada 24 horas un correo con todas las transferencias pendientes.
 
+### Dirección privada para clases a domicilio
+
+En **Configuración del proyecto → Propiedades del script**, crea:
+
+- Propiedad: `HOME_ADDRESS`
+- Valor: tu dirección completa
+
+La dirección queda únicamente en Apps Script. No se envía al navegador ni se publica en GitHub.
+
 Con la integración activa:
 
 - La disponibilidad excluye eventos existentes de tu Google Calendar.
@@ -48,6 +57,7 @@ Con la integración activa:
 - Se invita automáticamente al correo del alumno.
 - Para clases online se crea un enlace de Google Meet.
 - Todas las clases nuevas se crean con color amarillo en Google Calendar.
+- Las clases a domicilio agregan un recargo calculado por tiempo y costo de traslado.
 - En clases grupales se invita al correo principal y a todos los integrantes.
 - La reserva puede registrar opcionalmente quién recomendó la clase.
 

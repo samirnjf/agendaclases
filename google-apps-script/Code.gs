@@ -12,6 +12,12 @@ const CALENDAR_ID = "primary";
 const TIMEZONE = "America/Santiago";
 const FIRST_START_HOUR = 7;
 const LAST_START_HOUR = 22;
+const BASE_HOURLY_RATE = 15000;
+const TRAVEL_TIME_HOURLY_RATE = 6000;
+const TRANSIT_WEIGHT = 0.7;
+const CAR_WEIGHT = 0.3;
+const DEFAULT_TRANSIT_FARE_PER_LEG = 900;
+const CAR_COST_PER_KM = 220;
 const EVALUATION_BUFFER_MINUTES = 60;
 const EVALUATION_KEYWORDS = ["prueba", "evaluacion", "examen", "control", "certamen", "presentacion"];
 // Color 5 corresponde a amarillo ("Banana") en Google Calendar.
@@ -55,7 +61,18 @@ function doPost(e) {
       setupDailyPaymentReminder();
       return jsonResponse({ success: true, reminderEnabled: true });
     }
+    if (data.action === "travelQuote") {
+      return jsonResponse({ success: true, ...calculateTravelQuote(data.destination) });
+    }
     validateBooking(data);
+
+    const basePrice = BASE_HOURLY_RATE * Number(data.duration) / 60;
+    const travelQuote = data.modality === "A domicilio"
+      ? calculateTravelQuote(data.location)
+      : { surcharge: 0, roundTripMinutes: 0 };
+    data.travelSurcharge = travelQuote.surcharge;
+    data.travelMinutes = travelQuote.roundTripMinutes;
+    data.price = basePrice + travelQuote.surcharge;
 
     const start = new Date(`${data.date}T${data.start}:00`);
     const end = new Date(`${data.date}T${data.end}:00`);
@@ -86,6 +103,8 @@ function doPost(e) {
       data.groupEmails && data.groupEmails.length ? `Integrantes: ${data.groupEmails.join(", ")}` : "",
       `Lugar: ${data.location}`,
       data.topic ? `Contenido: ${data.topic}` : "",
+      data.travelSurcharge ? `Recargo traslado: $${Number(data.travelSurcharge).toLocaleString("es-CL")}` : "",
+      data.travelMinutes ? `Tiempo traslado estimado: ${data.travelMinutes} minutos ida y vuelta` : "",
       `Valor: $${Number(data.price).toLocaleString("es-CL")}`,
     ].filter(Boolean).join("\n");
 
@@ -126,6 +145,65 @@ function doPost(e) {
   } finally {
     lock.releaseLock();
   }
+}
+
+/**
+ * El domicilio privado se guarda en Propiedades del script con la clave
+ * HOME_ADDRESS. Nunca se devuelve al navegador.
+ */
+function calculateTravelQuote(destination) {
+  if (!destination || destination.trim().length < 6) throw new Error("Ingresa una dirección válida.");
+  const homeAddress = PropertiesService.getScriptProperties().getProperty("HOME_ADDRESS");
+  if (!homeAddress) throw new Error("Falta configurar la dirección privada de origen.");
+
+  const departure = new Date(Date.now() + 24 * 60 * 60 * 1000);
+  departure.setHours(12, 0, 0, 0);
+  const driving = getRouteEstimate(homeAddress, destination, Maps.DirectionFinder.Mode.DRIVING, departure);
+  let transit;
+  try {
+    transit = getRouteEstimate(homeAddress, destination, Maps.DirectionFinder.Mode.TRANSIT, departure);
+  } catch (error) {
+    transit = {
+      minutes: Math.round(driving.minutes * 1.35),
+      distanceKm: driving.distanceKm,
+      fare: DEFAULT_TRANSIT_FARE_PER_LEG,
+    };
+  }
+
+  const transitCostRoundTrip = (transit.fare || DEFAULT_TRANSIT_FARE_PER_LEG) * 2;
+  const carCostRoundTrip = driving.distanceKm * 2 * CAR_COST_PER_KM;
+  const transportCost = transitCostRoundTrip * TRANSIT_WEIGHT + carCostRoundTrip * CAR_WEIGHT;
+  const oneWayMinutes = transit.minutes * TRANSIT_WEIGHT + driving.minutes * CAR_WEIGHT;
+  const roundTripMinutes = Math.round(oneWayMinutes * 2);
+  const timeCost = roundTripMinutes / 60 * TRAVEL_TIME_HOURLY_RATE;
+  const surcharge = Math.max(0, Math.round((transportCost + timeCost) / 500) * 500);
+
+  return {
+    surcharge,
+    roundTripMinutes,
+    transportCost: Math.round(transportCost / 100) * 100,
+    timeCost: Math.round(timeCost / 100) * 100,
+  };
+}
+
+function getRouteEstimate(origin, destination, mode, departure) {
+  const finder = Maps.newDirectionFinder()
+    .setOrigin(origin)
+    .setDestination(destination)
+    .setMode(mode)
+    .setRegion("cl")
+    .setLanguage("es");
+  if (mode === Maps.DirectionFinder.Mode.TRANSIT) finder.setDepart(departure);
+  const directions = finder.getDirections();
+  if (!directions.routes || !directions.routes.length) throw new Error("No encontramos una ruta hacia esa dirección.");
+  const route = directions.routes[0];
+  const leg = route.legs && route.legs[0];
+  if (!leg || !leg.duration || !leg.distance) throw new Error("No pudimos calcular el traslado.");
+  return {
+    minutes: Math.max(1, Math.round(leg.duration.value / 60)),
+    distanceKm: leg.distance.value / 1000,
+    fare: route.fare && route.fare.value ? Number(route.fare.value) : 0,
+  };
 }
 
 /**
@@ -405,7 +483,7 @@ function sendDailyPaymentReminder() {
 }
 
 function validateBooking(data) {
-  const required = ["name", "email", "date", "start", "end", "subject", "modality"];
+  const required = ["name", "email", "date", "start", "end", "subject", "modality", "duration"];
   required.forEach(field => {
     if (!data[field]) throw new Error(`Falta el campo ${field}.`);
   });
