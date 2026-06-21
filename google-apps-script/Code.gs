@@ -77,6 +77,11 @@ function doPost(e) {
       setupDailyPaymentReminder();
       return jsonResponse({ success: true, reminderEnabled: true });
     }
+    if (data.action === "setupRecordingDelivery") {
+      requireAdmin(data.adminKey);
+      setupRecordingDelivery();
+      return jsonResponse({ success: true, recordingDeliveryEnabled: true });
+    }
     if (data.action === "updateUniversityDays") {
       requireAdmin(data.adminKey);
       const universityDays = saveUniversityDays(data.days);
@@ -521,6 +526,7 @@ function buildAdminReport() {
       overdueAmount: pendingPast,
     },
     reminderEnabled: isPaymentReminderEnabled(),
+    recordingDeliveryEnabled: isRecordingDeliveryEnabled(),
     upcoming,
     history,
     frequent: clients.sort((a, b) => b.classes - a.classes || b.totalExpected - a.totalExpected).slice(0, 10),
@@ -646,6 +652,109 @@ function sendDailyPaymentReminder() {
   ].join("\n");
 
   MailApp.sendEmail(OWNER_EMAIL, subject, body);
+}
+
+/**
+ * Revisa cada cinco minutos si Google terminó de procesar grabaciones de Meet.
+ * La grabación debe haberse iniciado durante la reunión y la cuenta debe tener
+ * habilitada esta función de Google Workspace.
+ */
+function setupRecordingDelivery() {
+  ScriptApp.getProjectTriggers()
+    .filter(trigger => trigger.getHandlerFunction() === "deliverProcessedMeetRecordings")
+    .forEach(trigger => ScriptApp.deleteTrigger(trigger));
+
+  ScriptApp.newTrigger("deliverProcessedMeetRecordings")
+    .timeBased()
+    .everyMinutes(5)
+    .create();
+}
+
+function isRecordingDeliveryEnabled() {
+  return ScriptApp.getProjectTriggers()
+    .some(trigger => trigger.getHandlerFunction() === "deliverProcessedMeetRecordings");
+}
+
+function deliverProcessedMeetRecordings() {
+  const now = new Date();
+  const from = new Date(now.getTime() - 36 * 60 * 60 * 1000);
+  const events = [];
+  let pageToken;
+  do {
+    const result = Calendar.Events.list(CALENDAR_ID, {
+      timeMin: from.toISOString(),
+      timeMax: now.toISOString(),
+      singleEvents: true,
+      orderBy: "startTime",
+      maxResults: 250,
+      pageToken,
+    });
+    (result.items || []).forEach(event => events.push(event));
+    pageToken = result.nextPageToken;
+  } while (pageToken);
+
+  events
+    .filter(event => (event.summary || "").indexOf("Clase de ") === 0)
+    .filter(event => parseDescription(event.description || "").Modalidad === "Online")
+    .forEach(event => deliverEventRecordings(event));
+}
+
+function deliverEventRecordings(event) {
+  const details = parseDescription(event.description || "");
+  const recipients = [details.Correo]
+    .concat(String(details.Integrantes || "").split(","))
+    .map(email => email.trim().toLowerCase())
+    .filter((email, index, all) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) && all.indexOf(email) === index);
+  if (!recipients.length) return;
+
+  const files = getEventRecordingFiles(event);
+  files.forEach(file => {
+    const sentKey = `recording-sent:${event.id}:${file.getId()}`;
+    if (PropertiesService.getScriptProperties().getProperty(sentKey) === "true") return;
+    try {
+      file.addViewers(recipients);
+      recipients.forEach(email => {
+        MailApp.sendEmail({
+          to: email,
+          subject: `Grabación de tu clase: ${details.Ramo || event.summary}`,
+          body: [
+            `Hola${details.Estudiante ? ` ${details.Estudiante}` : ""},`,
+            "",
+            "La grabación de tu clase online ya está disponible.",
+            "",
+            `Clase: ${details.Ramo || event.summary}`,
+            `Ver grabación: ${file.getUrl()}`,
+            "",
+            "Este enlace es privado y fue compartido con los participantes registrados.",
+            "",
+            "ClasesSNF",
+          ].join("\n"),
+        });
+      });
+      PropertiesService.getScriptProperties().setProperty(sentKey, "true");
+    } catch (error) {
+      console.error(`No se pudo compartir la grabación ${file.getId()}: ${error.message}`);
+    }
+  });
+}
+
+function getEventRecordingFiles(event) {
+  const files = [];
+  (event.attachments || []).forEach(attachment => {
+    const title = normalizeCalendarTitle(attachment.title || "");
+    const mimeType = String(attachment.mimeType || "").toLowerCase();
+    const looksLikeRecording =
+      mimeType.indexOf("video") >= 0 ||
+      title.indexOf("recording") >= 0 ||
+      title.indexOf("grabacion") >= 0;
+    if (!looksLikeRecording || !attachment.fileId) return;
+    try {
+      files.push(DriveApp.getFileById(attachment.fileId));
+    } catch (error) {
+      console.error(`No se pudo abrir la grabación ${attachment.fileId}: ${error.message}`);
+    }
+  });
+  return files;
 }
 
 function validateBooking(data) {

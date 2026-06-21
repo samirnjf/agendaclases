@@ -42,12 +42,22 @@ async function loadReport() {
 
 function renderAll() {
   renderReminderStatus();
+  renderRecordingStatus();
   renderUniversityDays();
   renderMetrics();
   renderOverview();
   renderTable("upcomingTable", report.upcoming);
   renderTable("historyTable", report.history);
   renderClients(report.frequent);
+}
+
+function renderRecordingStatus() {
+  const button = $("#recordingButton");
+  button.classList.toggle("enabled", report.recordingDeliveryEnabled);
+  button.disabled = report.recordingDeliveryEnabled;
+  $("#recordingLabel").textContent = report.recordingDeliveryEnabled
+    ? "Envío de grabaciones activo"
+    : "Activar envío de grabaciones";
 }
 
 function renderUniversityDays() {
@@ -169,6 +179,20 @@ $("#loginForm").addEventListener("submit", event => {
   loadReport();
 });
 $("#refreshButton").addEventListener("click", loadReport);
+$("#recordingButton").addEventListener("click", async () => {
+  const button = $("#recordingButton");
+  button.disabled = true;
+  $("#recordingLabel").textContent = "Activando...";
+  try {
+    await api({ action: "setupRecordingDelivery" });
+    toast("Envío automático de grabaciones activado");
+    await loadReport();
+  } catch (error) {
+    toast(error.message);
+    button.disabled = false;
+    $("#recordingLabel").textContent = "Activar envío de grabaciones";
+  }
+});
 $("#saveUniversityDays").addEventListener("click", async () => {
   const button = $("#saveUniversityDays");
   const days = $$('#universityDays input:checked').map(input => Number(input.value));

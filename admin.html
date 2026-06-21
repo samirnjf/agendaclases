@@ -8,7 +8,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@600;700;800&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="admin.css?v=20260621-2" />
+    <link rel="stylesheet" href="admin.css?v=20260621-3" />
   </head>
   <body>
     <div class="login-screen" id="loginScreen">
@@ -42,6 +42,7 @@
         <header>
           <div><span class="eyebrow">Administración</span><h1 id="sectionTitle">Resumen</h1></div>
           <div class="header-actions">
+            <button class="reminder-button" id="recordingButton"><svg viewBox="0 0 24 24"><rect x="3" y="6" width="13" height="12" rx="2"/><path d="m16 10 5-3v10l-5-3"/></svg><span id="recordingLabel">Activar envío de grabaciones</span></button>
             <button class="reminder-button" id="reminderButton"><svg viewBox="0 0 24 24"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4"/></svg><span id="reminderLabel">Activar recordatorio diario</span></button>
             <button class="refresh" id="refreshButton"><svg viewBox="0 0 24 24"><path d="M20 11a8 8 0 1 0-2 5.5M20 5v6h-6"/></svg>Actualizar</button>
           </div>
@@ -93,6 +94,6 @@
       <div class="payment-detail-list" id="paymentDetailList"></div>
     </dialog>
     <div class="toast" id="toast"></div>
-    <script src="admin.js?v=20260621-2"></script>
+    <script src="admin.js?v=20260621-3"></script>
   </body>
 </html>

@@ -8,6 +8,11 @@ se valida por separado y genera su propio evento e invitación de Google Calenda
 La duración se recalcula y valida también en el servidor. Una clase de dos horas bloquea
 las dos horas completas en Google Calendar y no permite reservas que se superpongan.
 
+Las clases online grabadas pueden enviarse automáticamente al alumno y a los integrantes.
+Google primero debe procesar el archivo; el sistema lo revisa cada cinco minutos, concede
+acceso privado en Drive y envía el enlace. La grabación debe iniciarse durante el Meet y
+la cuenta de Google Workspace debe tener habilitada la función de grabación.
+
 ## Ejecutar localmente
 
 ```bash
@@ -50,6 +55,8 @@ Antes de utilizarlo:
 4. Entra al panel con esa clave. La clave solo se conserva durante la sesión del navegador.
 5. Pulsa **Activar recordatorio diario** una sola vez. Apps Script pedirá los permisos
    necesarios y enviará cada 24 horas un correo con todas las transferencias pendientes.
+6. Ejecuta una vez `setupRecordingDelivery` desde el editor de Apps Script y autoriza
+   acceso a Drive. Luego el panel mostrará **Envío de grabaciones activo**.
 
 ### Dirección privada para clases a domicilio
 
