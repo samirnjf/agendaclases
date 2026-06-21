@@ -30,6 +30,8 @@ Con la integración activa:
 - Se crea el evento en tu calendario.
 - Se invita automáticamente al correo del alumno.
 - Para clases online se crea un enlace de Google Meet.
+- En clases grupales se invita al correo principal y a todos los integrantes.
+- La reserva puede registrar opcionalmente quién recomendó la clase.
 
 > Para una publicación abierta a gran escala conviene añadir CAPTCHA y límites de solicitudes
 > para evitar reservas automatizadas. La versión actual está planteada como un MVP funcional.

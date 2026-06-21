@@ -4,9 +4,9 @@
   --line: #dedce1;
   --surface: #fff;
   --soft: #f3f2f4;
-  --primary: #493d75;
-  --primary-dark: #352c56;
-  --primary-soft: #ebe8f3;
+  --primary: #527565;
+  --primary-dark: #3f5d50;
+  --primary-soft: #e5ece8;
   --green: #276e59;
   --danger: #9b3c43;
   --shadow: 0 18px 48px rgba(20, 18, 24, .09);
@@ -96,12 +96,12 @@ input::placeholder, textarea::placeholder { color: #b1adb7; }
 .choice-grid.three { grid-template-columns: repeat(3, 1fr); }
 .choice-card { position: relative; display: flex; align-items: center; gap: 11px; min-height: 68px; padding: 12px; border: 1px solid #dcd9df; border-radius: 6px; cursor: pointer; transition: .15s ease; }
 .choice-card:hover { border-color: #88828e; }
-.choice-card:has(input:checked) { border-color: #3f3946; background: #f4f2f6; box-shadow: inset 3px 0 #493d75; }
+.choice-card:has(input:checked) { border-color: #465e53; background: #f1f5f3; box-shadow: inset 3px 0 #527565; }
 .choice-card input { position: absolute; opacity: 0; }
 .choice-icon { display: grid; width: 36px; height: 36px; flex: 0 0 auto; place-items: center; border-radius: 5px; }
 .choice-icon svg { width: 19px; }
 .choice-icon.coral { color: #74483f; background: #eee5e2; }
-.choice-icon.purple { color: var(--primary); background: #e8e5ed; }
+.choice-icon.purple { color: var(--primary); background: #e3ebe7; }
 .choice-icon.blue { color: #3f596d; background: #e4e9ed; }
 .choice-icon.green { color: var(--green); background: #e2e9e6; }
 .choice-card > span:nth-of-type(2) { display: grid; gap: 2px; }
@@ -114,6 +114,20 @@ input::placeholder, textarea::placeholder { color: #b1adb7; }
 .conditional-fields { margin: 3px 0 20px; padding: 17px; border: 1px solid #e1dfe3; border-radius: 6px; background: #f5f4f6; }
 .topic-field { margin-top: 6px; }
 .location-field { margin: -8px 0 20px; }
+.group-members { margin: -8px 0 22px; padding: 15px; border: 1px solid #dedbe1; border-radius: 6px; background: #f5f4f6; }
+.group-members-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 10px; }
+.group-members-heading > div { display: grid; gap: 2px; }
+.group-members-heading strong { font-size: 10px; }
+.group-members-heading span { color: var(--muted); font-size: 8px; }
+.group-members-heading button { display: inline-flex; align-items: center; gap: 5px; padding: 6px 8px; border: 0; border-radius: 4px; color: var(--primary); background: var(--primary-soft); font-size: 8px; font-weight: 700; cursor: pointer; }
+.group-members-heading button svg { width: 13px; }
+#memberEmailList { display: grid; gap: 8px; }
+.member-email-row { display: grid; grid-template-columns: 1fr 32px; gap: 7px; }
+.member-email-row .input-wrap { height: 38px; }
+.remove-member { display: grid; width: 32px; height: 38px; place-items: center; border: 0; border-radius: 4px; color: var(--muted); background: transparent; cursor: pointer; }
+.remove-member:hover { color: var(--danger); background: var(--soft); }
+.remove-member svg { width: 15px; }
+.group-members-error { display: block; min-height: 11px; margin-top: 5px; color: var(--danger); font-size: 9px; }
 .duration-group { margin-top: 2px; }
 .duration-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 10px; }
 .duration-grid label { cursor: pointer; }
@@ -271,9 +285,9 @@ input::placeholder, textarea::placeholder { color: #b1adb7; }
   --line: #39363e;
   --surface: #211f24;
   --soft: #29272c;
-  --primary: #9c8de2;
-  --primary-dark: #8877d5;
-  --primary-soft: #353044;
+  --primary: #82ad98;
+  --primary-dark: #6f9985;
+  --primary-soft: #293b33;
   --green: #69b79d;
   --danger: #ef8b92;
   --shadow: 0 22px 60px rgba(0, 0, 0, .34);
@@ -326,9 +340,9 @@ body {
 }
 
 .pill {
-  color: #c0b5ef;
-  border-color: #45404f;
-  background: #292630;
+  color: #a8cbb9;
+  border-color: #3d5147;
+  background: #243029;
 }
 
 .trust-row {
@@ -360,8 +374,8 @@ body {
 }
 
 .steps li.complete i {
-  border-color: #625a77;
-  background: #322e3b;
+  border-color: #536a5f;
+  background: #29372f;
 }
 
 .steps li.complete i::after,
@@ -408,8 +422,8 @@ body {
 .input-wrap:focus-within,
 .field select:focus,
 .field textarea:focus {
-  border-color: #9588cd;
-  box-shadow: 0 0 0 2px rgba(156, 141, 226, .12);
+  border-color: #719884;
+  box-shadow: 0 0 0 2px rgba(130, 173, 152, .12);
 }
 
 .input-wrap input {
@@ -455,8 +469,8 @@ textarea::placeholder {
 }
 
 .choice-icon.purple {
-  color: #b4a5ec;
-  background: #332e43;
+  color: #9dc8b2;
+  background: #293a32;
 }
 
 .choice-icon.blue {
@@ -472,6 +486,16 @@ textarea::placeholder {
 .conditional-fields {
   border-color: #3d3942;
   background: #1b1a1e;
+}
+
+.group-members {
+  border-color: #3d4942;
+  background: #1b1e1c;
+}
+
+.group-members-heading button {
+  color: #add0be;
+  background: #293b33;
 }
 
 .schedule-layout,
@@ -566,7 +590,7 @@ textarea::placeholder {
 }
 
 .calendar-link {
-  color: #c0b5ef;
-  border-color: #514966;
-  background: #302b3c;
+  color: #add0be;
+  border-color: #496154;
+  background: #293b33;
 }

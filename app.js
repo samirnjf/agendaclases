@@ -105,6 +105,34 @@ function updateModality() {
   form.location.placeholder = modality === "A domicilio" ? "Calle, número y comuna" : "Campus, biblioteca o sala";
 }
 
+function updateClassType() {
+  const isGroup = formData().classType === "Grupal";
+  $("#groupMembers").hidden = !isGroup;
+  if (isGroup && !$(".member-email", $("#memberEmailList"))) addMemberEmail();
+  if (!isGroup) $("#memberEmailsError").textContent = "";
+}
+
+function addMemberEmail(value = "") {
+  const row = document.createElement("div");
+  row.className = "member-email-row";
+  row.innerHTML = `
+    <div class="input-wrap">
+      <svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m4 7 8 6 8-6"/></svg>
+      <input class="member-email" type="email" placeholder="integrante@gmail.com" value="${value}">
+    </div>
+    <button type="button" class="remove-member" aria-label="Eliminar correo">
+      <svg viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18"/></svg>
+    </button>`;
+  $("#memberEmailList").append(row);
+}
+
+function groupEmails() {
+  const mainEmail = formData().email?.trim().toLowerCase();
+  return [...new Set($$(".member-email", $("#memberEmailList"))
+    .map(input => input.value.trim().toLowerCase())
+    .filter(email => email && email !== mainEmail))];
+}
+
 function setStep(next) {
   state.step = Math.max(1, Math.min(5, next));
   $$(".form-step").forEach(section => section.classList.toggle("active", Number(section.dataset.step) === state.step));
@@ -164,6 +192,18 @@ function validateStep(step) {
       valid = false;
     }
   });
+
+  if (step === 3 && formData().classType === "Grupal") {
+    const inputs = $$(".member-email", $("#memberEmailList"));
+    const emails = groupEmails();
+    const invalidEmail = inputs.some(input => input.value.trim() && !input.checkValidity());
+    if (!emails.length || invalidEmail) {
+      $("#memberEmailsError").textContent = !emails.length
+        ? "Agrega al menos un correo para la clase grupal."
+        : "Revisa que todos los correos sean válidos.";
+      valid = false;
+    }
+  }
 
   if (step === 4 && (!state.selectedDate || !state.selectedTime)) {
     $("#scheduleError").textContent = "Selecciona una fecha y un horario disponible.";
@@ -261,7 +301,12 @@ function renderSummary() {
   $("#summaryDuration").textContent = duration === 60 ? "1 hora" : duration === 90 ? "1 hora 30 min" : "2 horas";
   $("#summaryModality").textContent = data.modality === "Online" ? "Online · Google Meet" : `${data.modality} · ${data.location}`;
   $("#summaryStudent").textContent = data.name;
-  $("#summaryEmail").textContent = data.email;
+  $("#summaryClassType").textContent = data.classType === "Grupal"
+    ? `Grupal · ${groupEmails().length + 1} integrantes`
+    : "Individual";
+  $("#summaryEmail").textContent = data.classType === "Grupal"
+    ? `${data.email} y ${groupEmails().length} más`
+    : data.email;
   $("#noticeEmail").textContent = data.email;
   $("#summaryPrice").textContent = money.format(CONFIG.pricePerHour * duration / 60);
 }
@@ -273,11 +318,14 @@ function buildPayload() {
     name: data.name,
     email: data.email,
     phone: data.phone || "",
+    referral: data.referral || "",
     level: data.level,
     course: selectedCourse(data),
     subject: selectedSubject(data),
     topic: data.topic || "",
     modality: data.modality,
+    classType: data.classType,
+    groupEmails: data.classType === "Grupal" ? groupEmails() : [],
     location: data.modality === "Online" ? "Google Meet" : data.location,
     date: state.selectedDate,
     start: state.selectedTime,
@@ -337,6 +385,8 @@ function resetBooking() {
   state.month = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
   updateLevelFields();
   updateModality();
+  updateClassType();
+  $("#memberEmailList").innerHTML = "";
   $("#successDialog").close();
   setStep(1);
 }
@@ -361,6 +411,7 @@ form.addEventListener("change", event => {
   if (event.target.name === "level") updateLevelFields();
   if (event.target.name === "career") updateSubjects();
   if (event.target.name === "modality") updateModality();
+  if (event.target.name === "classType") updateClassType();
   if (event.target.name === "duration" && state.selectedDate) loadAvailability(state.selectedDate);
   const field = event.target.closest(".field");
   if (field) {
@@ -368,6 +419,17 @@ form.addEventListener("change", event => {
     const error = $(".field-error", field);
     if (error) error.textContent = "";
   }
+});
+$("#addMemberButton").addEventListener("click", () => addMemberEmail());
+$("#memberEmailList").addEventListener("click", event => {
+  const remove = event.target.closest(".remove-member");
+  if (!remove) return;
+  remove.closest(".member-email-row").remove();
+  if (!$(".member-email", $("#memberEmailList"))) addMemberEmail();
+  $("#memberEmailsError").textContent = "";
+});
+$("#memberEmailList").addEventListener("input", () => {
+  $("#memberEmailsError").textContent = "";
 });
 $("#calendarDays").addEventListener("click", event => {
   const day = event.target.closest("[data-date]");
@@ -400,4 +462,5 @@ $("#newBookingButton").addEventListener("click", resetBooking);
 initializeCareers();
 updateLevelFields();
 updateModality();
+updateClassType();
 renderCalendar();

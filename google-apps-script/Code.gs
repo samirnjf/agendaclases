@@ -50,10 +50,13 @@ function doPost(e) {
       `Estudiante: ${data.name}`,
       `Correo: ${data.email}`,
       data.phone ? `Teléfono: ${data.phone}` : "",
+      data.referral ? `Recomendado por: ${data.referral}` : "",
       `Nivel: ${data.level}`,
       `Carrera/curso: ${data.course}`,
       `Ramo: ${data.subject}`,
       `Modalidad: ${data.modality}`,
+      `Tipo de clase: ${data.classType || "Individual"}`,
+      data.groupEmails && data.groupEmails.length ? `Integrantes: ${data.groupEmails.join(", ")}` : "",
       `Lugar: ${data.location}`,
       data.topic ? `Contenido: ${data.topic}` : "",
       `Valor: $${Number(data.price).toLocaleString("es-CL")}`,
@@ -65,7 +68,7 @@ function doPost(e) {
       location: data.location,
       start: { dateTime: start.toISOString(), timeZone: TIMEZONE },
       end: { dateTime: end.toISOString(), timeZone: TIMEZONE },
-      attendees: [{ email: data.email }],
+      attendees: [data.email].concat(data.groupEmails || []).map(email => ({ email })),
       guestsCanModify: false,
       guestsCanInviteOthers: false,
     };
@@ -104,6 +107,16 @@ function validateBooking(data) {
   });
   requireDate(data.date);
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email)) throw new Error("El correo no es válido.");
+  if (data.classType === "Grupal") {
+    if (!Array.isArray(data.groupEmails) || !data.groupEmails.length) {
+      throw new Error("La clase grupal requiere al menos un correo adicional.");
+    }
+    data.groupEmails.forEach(email => {
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        throw new Error(`El correo ${email} no es válido.`);
+      }
+    });
+  }
   const startHour = Number(data.start.split(":")[0]);
   if (startHour < FIRST_START_HOUR || startHour > LAST_START_HOUR) {
     throw new Error("La hora de inicio debe estar entre las 07:00 y las 22:00.");

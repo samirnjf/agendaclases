@@ -95,6 +95,13 @@
                     <input name="phone" type="tel" autocomplete="tel" placeholder="+56 9 1234 5678" />
                   </div>
                 </label>
+                <label class="field full">
+                  <span>¿Quién te recomendó la clase? <b>opcional</b></span>
+                  <div class="input-wrap">
+                    <svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3"/><circle cx="17" cy="10" r="2.5"/><path d="M3.5 19a5.5 5.5 0 0 1 11 0M14 15a4.5 4.5 0 0 1 6.5 4"/></svg>
+                    <input name="referral" placeholder="Nombre de la persona" />
+                  </div>
+                </label>
               </div>
             </section>
 
@@ -176,6 +183,34 @@
                 <h2>¿Cómo prefieres estudiar?</h2>
                 <p>Elige una modalidad y la duración que más te acomode.</p>
               </div>
+              <fieldset class="choice-group">
+                <legend>Tipo de clase</legend>
+                <div class="choice-grid two">
+                  <label class="choice-card">
+                    <input type="radio" name="classType" value="Individual" required />
+                    <span class="choice-icon green"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M5 20a7 7 0 0 1 14 0"/></svg></span>
+                    <span><strong>Individual</strong><small>Clase para una persona</small></span>
+                    <i class="check"></i>
+                  </label>
+                  <label class="choice-card">
+                    <input type="radio" name="classType" value="Grupal" required />
+                    <span class="choice-icon green"><svg viewBox="0 0 24 24"><circle cx="8" cy="8" r="3"/><circle cx="17" cy="9" r="3"/><path d="M2.5 19a5.5 5.5 0 0 1 11 0M13 15a5 5 0 0 1 8.5 4"/></svg></span>
+                    <span><strong>Grupal</strong><small>Clase para dos o más personas</small></span>
+                    <i class="check"></i>
+                  </label>
+                </div>
+                <small class="group-error"></small>
+              </fieldset>
+
+              <div class="group-members" id="groupMembers" hidden>
+                <div class="group-members-heading">
+                  <div><strong>Correos de los integrantes</strong><span>Todos recibirán la invitación de Calendar.</span></div>
+                  <button type="button" id="addMemberButton"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg> Agregar correo</button>
+                </div>
+                <div id="memberEmailList"></div>
+                <small class="group-members-error" id="memberEmailsError"></small>
+              </div>
+
               <fieldset class="choice-group">
                 <legend>Modalidad</legend>
                 <div class="choice-grid three">
@@ -265,6 +300,7 @@
                   <div><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M12 8v4l3 2"/></svg><span>Duración<strong id="summaryDuration"></strong></span></div>
                   <div><svg viewBox="0 0 24 24"><path d="M20 10c0 5-8 11-8 11S4 15 4 10a8 8 0 1 1 16 0Z"/><circle cx="12" cy="10" r="2.5"/></svg><span>Modalidad<strong id="summaryModality"></strong></span></div>
                   <div><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M5 20a7 7 0 0 1 14 0"/></svg><span>Estudiante<strong id="summaryStudent"></strong></span></div>
+                  <div><svg viewBox="0 0 24 24"><circle cx="8" cy="8" r="3"/><circle cx="17" cy="9" r="3"/><path d="M2.5 19a5.5 5.5 0 0 1 11 0M13 15a5 5 0 0 1 8.5 4"/></svg><span>Tipo de clase<strong id="summaryClassType"></strong></span></div>
                   <div><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m4 7 8 6 8-6"/></svg><span>Invitación a<strong id="summaryEmail"></strong></span></div>
                 </div>
                 <div class="summary-total"><span>Total de la clase<small>Valor calculado según duración</small></span><strong id="summaryPrice"></strong></div>
