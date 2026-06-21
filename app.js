@@ -513,6 +513,7 @@ form.location.addEventListener("input", () => {
   state.travelQuote = null;
   state.quotedAddress = "";
   $("#travelQuote").hidden = true;
+  applyHomeDurationRule(60);
 });
 $("#addMemberButton").addEventListener("click", () => addMemberEmail());
 $("#memberEmailList").addEventListener("click", event => {

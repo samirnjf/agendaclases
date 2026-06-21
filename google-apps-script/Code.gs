@@ -184,13 +184,14 @@ function calculateTravelQuote(destination) {
   const roundTripMinutes = Math.round(oneWayMinutes * 2);
   const timeCost = roundTripMinutes / 60 * TRAVEL_TIME_HOURLY_RATE;
   const rawSurcharge = Math.max(0, Math.round((transportCost + timeCost) / 500) * 500);
-  const isFarWithoutMetro = !transit.hasMetro && (driving.distanceKm >= 15 || oneWayMinutes >= 55);
+  const isFarWithoutMetro = !transit.hasMetro && (driving.distanceKm >= 12 || oneWayMinutes >= 45);
 
   return {
     rawSurcharge,
     surcharge: rawSurcharge,
     roundTripMinutes,
     minimumDuration: isFarWithoutMetro ? 120 : 60,
+    requiresTwoHours: isFarWithoutMetro,
     transportCost: Math.round(transportCost / 100) * 100,
     timeCost: Math.round(timeCost / 100) * 100,
   };
@@ -218,8 +219,9 @@ function getRouteEstimate(origin, destination, mode, departure) {
 }
 
 function routeUsesMetro(leg) {
-  let minutesBeforeMetro = 0;
-  for (const step of (leg.steps || [])) {
+  const steps = leg.steps || [];
+  let lastMetroStep = -1;
+  steps.forEach((step, index) => {
     const vehicle = step.transit_details &&
       step.transit_details.line &&
       step.transit_details.line.vehicle;
@@ -227,10 +229,15 @@ function routeUsesMetro(leg) {
     const name = String(vehicle && (vehicle.name || vehicle.short_name) || "").toLowerCase();
     const isMetro = ["SUBWAY", "METRO_RAIL", "HEAVY_RAIL", "RAIL"].indexOf(type) >= 0 ||
       name.indexOf("metro") >= 0;
-    if (isMetro) return minutesBeforeMetro <= 20;
-    minutesBeforeMetro += Number(step.duration && step.duration.value || 0) / 60;
-  }
-  return false;
+    if (isMetro) lastMetroStep = index;
+  });
+  if (lastMetroStep < 0) return false;
+
+  const minutesFromLastMetroToDestination = steps
+    .slice(lastMetroStep + 1)
+    .reduce((total, step) => total + Number(step.duration && step.duration.value || 0) / 60, 0);
+
+  return minutesFromLastMetroToDestination <= 20;
 }
 
 /**
