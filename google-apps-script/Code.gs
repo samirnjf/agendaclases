@@ -90,6 +90,10 @@ function doPost(e) {
     if (data.action === "travelQuote") {
       return jsonResponse({ success: true, ...calculateTravelQuote(data.destination) });
     }
+    if (data.action === "updateClass") {
+      requireAdmin(data.adminKey);
+      return jsonResponse(updateClassBooking(data));
+    }
     validateBooking(data);
     if (data.modality === "Universidad" && !isUniversityDayEnabled(data.date)) {
       throw new Error("Ese día no está habilitado para clases en la universidad.");
@@ -223,6 +227,172 @@ function sendNewBookingNotification(data, event) {
   }
 }
 
+function updateClassBooking(data) {
+  if (!data.eventId) throw new Error("Falta el identificador de la clase.");
+  const currentEvent = Calendar.Events.get(CALENDAR_ID, data.eventId);
+  if (!currentEvent || (currentEvent.summary || "").indexOf("Clase de ") !== 0) {
+    throw new Error("No encontramos esa clase en Google Calendar.");
+  }
+
+  const oldDetails = parseDescription(currentEvent.description || "");
+  const oldStart = new Date(currentEvent.start.dateTime || currentEvent.start.date);
+  const oldEnd = new Date(currentEvent.end.dateTime || currentEvent.end.date);
+  const oldClass = adminEvent(currentEvent, new Date());
+  const groupEmails = Array.isArray(data.groupEmails)
+    ? data.groupEmails.map(email => String(email).trim().toLowerCase()).filter(Boolean)
+    : String(oldDetails.Integrantes || "").split(",").map(email => email.trim().toLowerCase()).filter(Boolean);
+
+  const next = {
+    name: data.name || oldDetails.Estudiante || "",
+    email: String(data.email || oldDetails.Correo || "").trim().toLowerCase(),
+    phone: data.phone || oldDetails["Teléfono"] || "",
+    referral: data.referral || oldDetails["Recomendado por"] || "",
+    level: data.level || oldDetails.Nivel || "",
+    course: data.course || oldDetails["Carrera/curso"] || "",
+    subject: data.subject || oldDetails.Ramo || "",
+    topic: data.topic || oldDetails.Contenido || "",
+    modality: data.modality || oldDetails.Modalidad || "",
+    classType: data.classType || oldDetails["Tipo de clase"] || "Individual",
+    groupEmails,
+    location: data.location || oldDetails.Lugar || currentEvent.location || "",
+    date: data.date || Utilities.formatDate(oldStart, TIMEZONE, "yyyy-MM-dd"),
+    start: data.start || Utilities.formatDate(oldStart, TIMEZONE, "HH:mm"),
+    duration: Number(data.duration) || Math.round((oldEnd.getTime() - oldStart.getTime()) / 60000),
+    createMeet: (data.modality || oldDetails.Modalidad) === "Online",
+  };
+  next.end = timeFromMinutes(timeToMinutes(next.start) + Number(next.duration));
+
+  validateBooking(next);
+  if (next.modality === "Universidad" && !isUniversityDayEnabled(next.date)) {
+    throw new Error("Ese día no está habilitado para clases en la universidad.");
+  }
+
+  const basePrice = BASE_HOURLY_RATE * Number(next.duration) / 60;
+  const travelQuote = next.modality === "A domicilio"
+    ? calculateTravelQuote(next.location)
+    : { rawSurcharge: 0, roundTripMinutes: 0, minimumDuration: 60 };
+  if (Number(next.duration) < travelQuote.minimumDuration) {
+    throw new Error("Para esta dirección la clase debe durar al menos 2 horas.");
+  }
+  next.travelSurcharge = Math.min(travelQuote.rawSurcharge, basePrice);
+  next.travelMinutes = travelQuote.roundTripMinutes;
+  next.price = basePrice + next.travelSurcharge;
+
+  const start = new Date(`${next.date}T${next.start}:00`);
+  const end = new Date(start.getTime() + Number(next.duration) * 60 * 1000);
+  next.end = Utilities.formatDate(end, TIMEZONE, "HH:mm");
+
+  const calendar = CalendarApp.getCalendarById(CALENDAR_ID);
+  const dayStart = new Date(`${next.date}T00:00:00`);
+  const searchStart = new Date(dayStart.getTime() - 24 * 60 * 60 * 1000);
+  const dayEnd = new Date(`${next.date}T23:59:59`);
+  const busySlots = buildBusySlots(calendar.getEvents(searchStart, dayEnd), next.date, next.modality, data.eventId);
+  const oneWayTravelMinutes = next.modality === "A domicilio"
+    ? Math.ceil(travelQuote.roundTripMinutes / 2)
+    : 0;
+  const requestedStart = timeToMinutes(next.start) - oneWayTravelMinutes;
+  const requestedEnd = timeToMinutes(next.start) + Number(next.duration) + oneWayTravelMinutes;
+  const hasConflict = busySlots.some(slot =>
+    timeToMinutes(slot.start) < requestedEnd &&
+    timeToMinutes(slot.end) > requestedStart
+  );
+  if (hasConflict) throw new Error("Ese horario no está disponible o está restringido por una evaluación.");
+
+  const eventResource = {
+    summary: `Clase de ${next.subject} · ${next.name}`,
+    description: buildClassDescription(next),
+    location: next.location,
+    start: { dateTime: start.toISOString(), timeZone: TIMEZONE },
+    end: { dateTime: end.toISOString(), timeZone: TIMEZONE },
+    attendees: [next.email].concat(next.groupEmails || []).map(email => ({ email })),
+    guestsCanModify: false,
+    guestsCanInviteOthers: false,
+    colorId: CLASS_EVENT_COLOR_ID,
+  };
+
+  const options = { sendUpdates: "all", conferenceDataVersion: 0 };
+  if (next.createMeet && !(currentEvent.hangoutLink || currentEvent.conferenceData)) {
+    eventResource.conferenceData = {
+      createRequest: {
+        requestId: Utilities.getUuid(),
+        conferenceSolutionKey: { type: "hangoutsMeet" },
+      },
+    };
+    options.conferenceDataVersion = 1;
+  }
+
+  const updatedEvent = Calendar.Events.patch(eventResource, CALENDAR_ID, data.eventId, options);
+  const notificationSent = sendClassUpdateNotification(next, oldClass, updatedEvent);
+  return {
+    success: true,
+    event: adminEvent(updatedEvent, new Date()),
+    eventUrl: updatedEvent.htmlLink || "",
+    meetUrl: updatedEvent.hangoutLink || "",
+    notificationSent,
+  };
+}
+
+function buildClassDescription(data) {
+  return [
+    `Estudiante: ${data.name}`,
+    `Correo: ${data.email}`,
+    data.phone ? `Teléfono: ${data.phone}` : "",
+    data.referral ? `Recomendado por: ${data.referral}` : "",
+    `Nivel: ${data.level}`,
+    `Carrera/curso: ${data.course}`,
+    `Ramo: ${data.subject}`,
+    `Modalidad: ${data.modality}`,
+    `Tipo de clase: ${data.classType || "Individual"}`,
+    data.groupEmails && data.groupEmails.length ? `Integrantes: ${data.groupEmails.join(", ")}` : "",
+    `Lugar: ${data.location}`,
+    data.topic ? `Contenido: ${data.topic}` : "",
+    data.travelSurcharge ? `Costo adicional clase a domicilio: $${Number(data.travelSurcharge).toLocaleString("es-CL")}` : "",
+    data.travelMinutes ? `Tiempo traslado estimado: ${data.travelMinutes} minutos ida y vuelta` : "",
+    `Valor: $${Number(data.price).toLocaleString("es-CL")}`,
+  ].filter(Boolean).join("\n");
+}
+
+function sendClassUpdateNotification(next, oldClass, event) {
+  const recipients = [next.email]
+    .concat(next.groupEmails || [])
+    .map(email => String(email).trim().toLowerCase())
+    .filter((email, index, all) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) && all.indexOf(email) === index);
+  if (!recipients.length) return false;
+
+  const oldDate = oldClass.start
+    ? Utilities.formatDate(new Date(oldClass.start), TIMEZONE, "dd-MM-yyyy HH:mm")
+    : "";
+  const newDate = Utilities.formatDate(new Date(`${next.date}T${next.start}:00`), TIMEZONE, "dd-MM-yyyy HH:mm");
+  const body = [
+    `Hola${next.name ? ` ${next.name}` : ""},`,
+    "",
+    "Tu clase fue actualizada.",
+    "",
+    oldDate ? `Antes: ${oldClass.subject} · ${oldDate} · ${oldClass.modality} · ${oldClass.location}` : "",
+    `Ahora: ${next.subject} · ${newDate} a ${next.end} · ${next.modality} · ${next.location}`,
+    `Duración: ${next.duration} minutos`,
+    `Valor actualizado: $${Number(next.price).toLocaleString("es-CL")}`,
+    "",
+    event.htmlLink ? `Ver invitación actualizada: ${event.htmlLink}` : "",
+    "",
+    "La invitación de Google Calendar también fue actualizada.",
+    "",
+    "ClasesSNF",
+  ].filter(Boolean).join("\n");
+
+  try {
+    MailApp.sendEmail({
+      to: recipients.join(","),
+      subject: `Clase actualizada: ${next.subject} · ${next.date}`,
+      body,
+    });
+    return true;
+  } catch (error) {
+    console.error(`No se pudo enviar el aviso de modificación: ${error.message}`);
+    return false;
+  }
+}
+
 /**
  * El domicilio privado se guarda en Propiedades del script con la clave
  * HOME_ADDRESS. Nunca se devuelve al navegador.
@@ -314,9 +484,10 @@ function routeUsesMetro(leg) {
  * Las pruebas y evaluaciones bloquean desde las 07:00 hasta una hora después
  * de terminar. Los demás eventos bloquean únicamente su duración real.
  */
-function buildBusySlots(events, date, modality) {
+function buildBusySlots(events, date, modality, excludedEventId) {
   const slots = [];
   events.forEach(event => {
+    if (excludedEventId && normalizeEventId(event.getId && event.getId()) === normalizeEventId(excludedEventId)) return;
     const isEvaluation = isEvaluationEvent(event.getTitle());
     const eventStart = event.getStartTime();
     const eventEnd = event.getEndTime();
@@ -404,6 +575,14 @@ function normalizeCalendarTitle(title) {
 function timeToMinutes(time) {
   const parts = time.split(":").map(Number);
   return parts[0] * 60 + parts[1];
+}
+
+function timeFromMinutes(value) {
+  return `${String(Math.floor(value / 60)).padStart(2, "0")}:${String(value % 60).padStart(2, "0")}`;
+}
+
+function normalizeEventId(id) {
+  return String(id || "").split("@")[0];
 }
 
 function mergeBusySlots(slots) {
@@ -537,6 +716,7 @@ function adminEvent(event, now) {
   const details = parseDescription(event.description || "");
   const start = new Date(event.start.dateTime || event.start.date);
   const end = new Date(event.end.dateTime || event.end.date);
+  const duration = Math.round((end.getTime() - start.getTime()) / 60000);
   const price = Number((details.Valor || "0").replace(/[^\d]/g, "")) || 0;
   const paid = PropertiesService.getScriptProperties().getProperty(`paid:${event.id}`) === "true";
   return {
@@ -545,15 +725,21 @@ function adminEvent(event, now) {
     name: details.Estudiante || "",
     email: (details.Correo || "").toLowerCase(),
     phone: details["Teléfono"] || "",
+    level: details.Nivel || "",
     subject: details.Ramo || "",
     course: details["Carrera/curso"] || "",
+    topic: details.Contenido || "",
     modality: details.Modalidad || "",
     classType: details["Tipo de clase"] || "Individual",
+    groupEmails: String(details.Integrantes || "").split(",").map(email => email.trim().toLowerCase()).filter(Boolean),
     referral: details["Recomendado por"] || "",
     location: details.Lugar || event.location || "",
     created: event.created || "",
     start: start.toISOString(),
     end: end.toISOString(),
+    date: Utilities.formatDate(start, TIMEZONE, "yyyy-MM-dd"),
+    startTime: Utilities.formatDate(start, TIMEZONE, "HH:mm"),
+    duration,
     price,
     paid,
     isPast: end < now,

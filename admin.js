@@ -7,6 +7,7 @@ const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
 const currency = new Intl.NumberFormat("es-CL", { style: "currency", currency: "CLP", maximumFractionDigits: 0 });
 const dateFormat = new Intl.DateTimeFormat("es-CL", { day: "2-digit", month: "short", year: "numeric" });
 const dateTimeFormat = new Intl.DateTimeFormat("es-CL", { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+const UNIVERSITY_LOCATIONS = ["Biblioteca Edificio A", "Biblioteca Edificio F", "Biblioteca Edificio C"];
 let report = null;
 let adminKey = sessionStorage.getItem("claseListaAdminKey") || "";
 
@@ -112,7 +113,7 @@ function renderTable(target, items) {
     container.innerHTML = empty("No hay clases para mostrar.");
     return;
   }
-  container.innerHTML = `<table><thead><tr><th>Fecha</th><th>Cliente</th><th>Clase</th><th>Modalidad</th><th>Valor</th><th>Transferencia</th><th></th></tr></thead><tbody>${items.map(item => `<tr data-searchable="${escapeHtml(`${item.name} ${item.email} ${item.subject}`.toLowerCase())}"><td><strong>${dateTimeFormat.format(new Date(item.start))}</strong><small>${item.classType}</small></td><td><strong>${escapeHtml(item.name)}</strong><small>${escapeHtml(item.email)}</small></td><td><strong>${escapeHtml(item.subject)}</strong><small>${escapeHtml(item.course)}</small></td><td>${escapeHtml(item.modality)}</td><td><strong>${currency.format(item.price)}</strong></td><td><div class="payment-controls"><button class="payment-button pay-yes ${item.paid ? "active" : ""}" data-payment-id="${item.id}" data-paid-value="true" title="Transferencia recibida"><svg viewBox="0 0 24 24"><path d="m5 12.5 4 4 10-10"/></svg></button><button class="payment-button pay-no ${!item.paid ? "active" : ""}" data-payment-id="${item.id}" data-paid-value="false" title="Transferencia pendiente"><svg viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18"/></svg></button></div></td><td>${item.eventUrl ? `<a class="event-link" href="${item.eventUrl}" target="_blank">Abrir ↗</a>` : ""}</td></tr>`).join("")}</tbody></table>`;
+  container.innerHTML = `<table><thead><tr><th>Fecha</th><th>Cliente</th><th>Clase</th><th>Modalidad</th><th>Valor</th><th>Transferencia</th><th>Acciones</th></tr></thead><tbody>${items.map(item => `<tr data-searchable="${escapeHtml(`${item.name} ${item.email} ${item.subject}`.toLowerCase())}"><td><strong>${dateTimeFormat.format(new Date(item.start))}</strong><small>${item.classType}</small></td><td><strong>${escapeHtml(item.name)}</strong><small>${escapeHtml(item.email)}</small></td><td><strong>${escapeHtml(item.subject)}</strong><small>${escapeHtml(item.course)}</small></td><td>${escapeHtml(item.modality)}</td><td><strong>${currency.format(item.price)}</strong></td><td><div class="payment-controls"><button class="payment-button pay-yes ${item.paid ? "active" : ""}" data-payment-id="${item.id}" data-paid-value="true" title="Transferencia recibida"><svg viewBox="0 0 24 24"><path d="m5 12.5 4 4 10-10"/></svg></button><button class="payment-button pay-no ${!item.paid ? "active" : ""}" data-payment-id="${item.id}" data-paid-value="false" title="Transferencia pendiente"><svg viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18"/></svg></button></div></td><td><div class="row-actions"><button type="button" class="edit-link" data-edit-id="${escapeHtml(item.id)}">Editar</button>${item.eventUrl ? `<a class="event-link" href="${item.eventUrl}" target="_blank">Abrir ↗</a>` : ""}</div></td></tr>`).join("")}</tbody></table>`;
 }
 
 function renderClients(clients) {
@@ -150,6 +151,110 @@ function showPaymentDetail(type) {
       }).join("")
     : empty(isPaid ? "Todavía no has registrado transferencias." : "No hay pagos pendientes.");
   $("#paymentDialog").showModal();
+}
+
+function findClass(eventId) {
+  return [...(report?.upcoming || []), ...(report?.history || [])].find(item => item.id === eventId);
+}
+
+function dateInputValue(item) {
+  if (item.date) return item.date;
+  const date = new Date(item.start);
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+}
+
+function timeInputValue(item) {
+  if (item.startTime) return item.startTime;
+  const date = new Date(item.start);
+  return `${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
+}
+
+function openEditClass(eventId) {
+  const item = findClass(eventId);
+  if (!item) {
+    toast("No encontré esa clase en el reporte.");
+    return;
+  }
+  const form = $("#editClassForm");
+  form.reset();
+  form.eventId.value = item.id;
+  form.name.value = item.name || "";
+  form.email.value = item.email || "";
+  form.level.value = item.level || (item.course && item.course.toLowerCase().includes("ingeniería") ? "Universidad" : "Colegio");
+  form.course.value = item.course || "";
+  form.subject.value = item.subject || "";
+  form.classType.value = item.classType || "Individual";
+  form.groupEmails.value = (item.groupEmails || []).join(", ");
+  form.date.value = dateInputValue(item);
+  form.start.value = timeInputValue(item);
+  form.duration.value = String(item.duration || Math.round((new Date(item.end) - new Date(item.start)) / 60000) || 60);
+  form.modality.value = item.modality || "Online";
+  form.location.value = item.location || "";
+  form.topic.value = item.topic || "";
+  form.phone.value = item.phone || "";
+  form.referral.value = item.referral || "";
+  $("#editDialogTitle").textContent = `${item.name} · ${item.subject}`;
+  $("#editClassError").textContent = "";
+  applyEditModalityDefaults(false);
+  $("#editClassDialog").showModal();
+}
+
+function applyEditModalityDefaults(force = true) {
+  const form = $("#editClassForm");
+  const location = form.location;
+  if (form.modality.value === "Online") {
+    location.placeholder = "Google Meet";
+    if (force || !location.value) location.value = "Google Meet";
+  } else if (form.modality.value === "Universidad") {
+    location.placeholder = UNIVERSITY_LOCATIONS.join(" / ");
+    if (force || !UNIVERSITY_LOCATIONS.includes(location.value)) location.value = UNIVERSITY_LOCATIONS[0];
+  } else {
+    location.placeholder = "Dirección completa del cliente";
+    if (force && (location.value === "Google Meet" || UNIVERSITY_LOCATIONS.includes(location.value))) location.value = "";
+  }
+}
+
+async function saveEditedClass(event) {
+  event.preventDefault();
+  const form = $("#editClassForm");
+  const button = $("#saveEditClass");
+  $("#editClassError").textContent = "";
+  button.disabled = true;
+  button.textContent = "Guardando...";
+  const data = Object.fromEntries(new FormData(form).entries());
+  const payload = {
+    action: "updateClass",
+    eventId: data.eventId,
+    name: data.name.trim(),
+    email: data.email.trim().toLowerCase(),
+    phone: data.phone.trim(),
+    referral: data.referral.trim(),
+    level: data.level,
+    course: data.course.trim(),
+    subject: data.subject.trim(),
+    topic: data.topic.trim(),
+    classType: data.classType,
+    groupEmails: data.classType === "Grupal"
+      ? data.groupEmails.split(/[\n,;]/).map(email => email.trim().toLowerCase()).filter(Boolean)
+      : [],
+    date: data.date,
+    start: data.start,
+    duration: Number(data.duration),
+    modality: data.modality,
+    location: data.location.trim(),
+  };
+
+  try {
+    await api(payload);
+    $("#editClassDialog").close();
+    toast("Clase actualizada y cliente notificado");
+    await loadReport();
+  } catch (error) {
+    $("#editClassError").textContent = error.message;
+  } finally {
+    button.disabled = false;
+    button.textContent = "Guardar cambios";
+  }
 }
 
 function empty(message) {
@@ -233,6 +338,8 @@ document.addEventListener("click", async event => {
   if (section) showSection(section);
   const paymentDetail = event.target.closest("[data-payment-detail]")?.dataset.paymentDetail;
   if (paymentDetail) showPaymentDetail(paymentDetail);
+  const editButton = event.target.closest("[data-edit-id]");
+  if (editButton) openEditClass(editButton.dataset.editId);
   const payment = event.target.closest("[data-payment-id]");
   if (payment) {
     payment.disabled = true;
@@ -250,6 +357,13 @@ $("#closePaymentDialog").addEventListener("click", () => $("#paymentDialog").clo
 $("#paymentDialog").addEventListener("click", event => {
   if (event.target === $("#paymentDialog")) $("#paymentDialog").close();
 });
+$("#closeEditDialog").addEventListener("click", () => $("#editClassDialog").close());
+$("#cancelEditClass").addEventListener("click", () => $("#editClassDialog").close());
+$("#editClassDialog").addEventListener("click", event => {
+  if (event.target === $("#editClassDialog")) $("#editClassDialog").close();
+});
+$("#editClassForm").addEventListener("submit", saveEditedClass);
+$("#editClassForm").modality.addEventListener("change", () => applyEditModalityDefaults(true));
 $$("[data-search]").forEach(input => input.addEventListener("input", event => {
   const query = event.target.value.toLowerCase().trim();
   const page = event.target.dataset.search;

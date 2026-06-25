@@ -8,7 +8,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@600;700;800&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="admin.css?v=20260621-3" />
+    <link rel="stylesheet" href="admin.css?v=20260625-1" />
   </head>
   <body>
     <div class="login-screen" id="loginScreen">
@@ -93,7 +93,39 @@
       <div class="dialog-total"><span id="paymentDialogCount"></span><strong id="paymentDialogTotal"></strong></div>
       <div class="payment-detail-list" id="paymentDetailList"></div>
     </dialog>
+    <dialog class="edit-dialog" id="editClassDialog">
+      <form id="editClassForm" method="dialog">
+        <div class="dialog-heading">
+          <div><span class="eyebrow">Editar clase</span><h2 id="editDialogTitle">Modificar reserva</h2></div>
+          <button type="button" id="closeEditDialog" aria-label="Cerrar"><svg viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18"/></svg></button>
+        </div>
+        <div class="edit-grid">
+          <input type="hidden" name="eventId" />
+          <label><span>Estudiante</span><input name="name" required /></label>
+          <label><span>Correo</span><input name="email" type="email" required /></label>
+          <label><span>Nivel</span><select name="level" required><option>Colegio</option><option>Universidad</option></select></label>
+          <label><span>Carrera/curso</span><input name="course" required /></label>
+          <label><span>Ramo</span><input name="subject" required /></label>
+          <label><span>Tipo</span><select name="classType"><option>Individual</option><option>Grupal</option></select></label>
+          <label><span>Correos integrantes</span><input name="groupEmails" placeholder="correo1@gmail.com, correo2@gmail.com" /></label>
+          <label><span>Fecha</span><input name="date" type="date" required /></label>
+          <label><span>Hora inicio</span><input name="start" type="time" step="1800" required /></label>
+          <label><span>Duración</span><select name="duration" required><option value="60">1 hora</option><option value="90">1 hora 30 min</option><option value="120">2 horas</option></select></label>
+          <label><span>Modalidad</span><select name="modality" required><option>Online</option><option>Universidad</option><option>A domicilio</option></select></label>
+          <label class="wide"><span>Lugar</span><input name="location" required placeholder="Google Meet, biblioteca o dirección" /></label>
+          <label class="wide"><span>Contenido</span><textarea name="topic" rows="3" placeholder="Contenido de la clase"></textarea></label>
+          <label><span>Teléfono</span><input name="phone" /></label>
+          <label><span>Recomendado por</span><input name="referral" /></label>
+        </div>
+        <p class="edit-warning">Al guardar, se actualizará Google Calendar y se enviará aviso al cliente.</p>
+        <small class="edit-error" id="editClassError"></small>
+        <div class="dialog-actions">
+          <button type="button" id="cancelEditClass">Cancelar</button>
+          <button type="submit" id="saveEditClass">Guardar cambios</button>
+        </div>
+      </form>
+    </dialog>
     <div class="toast" id="toast"></div>
-    <script src="admin.js?v=20260621-3"></script>
+    <script src="admin.js?v=20260625-1"></script>
   </body>
 </html>
